@@ -1,0 +1,182 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TagCategory {
+  trope
+  mood
+  cast_type
+  monetization_type
+}
+
+enum Pacing {
+  fast
+  medium
+  slow
+}
+
+enum TitleStatus {
+  ongoing
+  completed
+  cancelled
+}
+
+enum PriceModel {
+  free
+  pay_per_unlock
+  subscription
+  ad_supported
+}
+
+enum InteractionAction {
+  viewed_listing
+  viewed_detail
+  clicked_out
+  saved
+  searched
+}
+
+// Controlled vocabulary for tags — the taxonomy asset. Versioned via
+// is_active so it can evolve without breaking already-tagged titles.
+model TagDefinition {
+  id          String      @id @default(uuid())
+  category    TagCategory
+  value       String
+  label       String
+  description String?
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@unique([category, value])
+  @@map("tag_definitions")
+}
+
+model Producer {
+  id            String    @id @default(uuid())
+  name          String
+  contactEmail  String?   @map("contact_email")
+  website       String?
+  isVerified    Boolean   @default(false) @map("is_verified")
+  verifiedAt    DateTime? @map("verified_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  titles Title[]
+
+  @@map("producers")
+}
+
+model Title {
+  id                String      @id @default(uuid())
+  producerId        String?     @map("producer_id")
+  producer          Producer?   @relation(fields: [producerId], references: [id], onDelete: SetNull)
+
+  name              String
+  synopsis          String?
+  language          String
+  countryOfOrigin   String?     @map("country_of_origin")
+
+  // Taxonomy — see TagDefinition for the controlled vocabulary these
+  // values must come from (validated at the application layer).
+  tropeTags         String[]    @map("trope_tags")
+  moodTags          String[]    @map("mood_tags")
+  pacing            Pacing?
+  castType          String?     @map("cast_type")
+
+  episodeCount        Int?       @map("episode_count")
+  avgEpisodeSeconds   Int?       @map("avg_episode_seconds")
+
+  releaseDate       DateTime?   @map("release_date") @db.Date
+  status            TitleStatus @default(ongoing)
+
+  coverImageUrl     String?     @map("cover_image_url")
+  isPublished       Boolean     @default(false) @map("is_published")
+
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  availability      Availability[]
+  reactions         TitleReaction[]
+  interactions      UserInteraction[]
+
+  @@index([language])
+  @@index([pacing])
+  @@index([isPublished])
+  @@map("titles")
+}
+
+model Availability {
+  id                  String     @id @default(uuid())
+  titleId             String     @map("title_id")
+  title               Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  platform            String
+  deepLinkUrl         String     @map("deep_link_url")
+  priceModel          PriceModel @map("price_model")
+  priceAmountCents    Int?       @map("price_amount_cents")
+  currency            String     @default("USD")
+
+  regionAvailability  String[]   @map("region_availability")
+
+  isActive            Boolean    @default(true) @map("is_active")
+  lastVerifiedAt       DateTime?  @map("last_verified_at")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt             DateTime   @updatedAt @map("updated_at")
+
+  interactions        UserInteraction[]
+
+  @@unique([titleId, platform, deepLinkUrl])
+  @@index([titleId])
+  @@index([platform])
+  @@map("availability")
+}
+
+// Editorial "why people love it" quotes — the emotional headline on the
+// detail page. Deliberately separate from the taxonomy: reactions are
+// what a user reads first, tags are plumbing shown behind a disclosure.
+model TitleReaction {
+  id            String   @id @default(uuid())
+  titleId       String   @map("title_id")
+  title         Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  emoji         String
+  quoteText     String   @map("quote_text")
+  authorHandle  String?  @map("author_handle")
+  displayOrder  Int      @default(0) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([titleId])
+  @@map("title_reactions")
+}
+
+// Seed of the recommendation flywheel — log every view/click/save/search
+// even before anything reads this table. Cheap now, invaluable later.
+model UserInteraction {
+  id              String             @id @default(uuid())
+  userId          String?            @map("user_id")
+  sessionId       String             @map("session_id")
+
+  titleId         String             @map("title_id")
+  title           Title              @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  availabilityId  String?            @map("availability_id")
+  availability    Availability?      @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
+
+  action          InteractionAction
+  metadata        Json               @default("{}")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  @@index([titleId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("user_interactions")
+}
+

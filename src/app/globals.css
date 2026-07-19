@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Kilig design tokens. Fixed dark cinematic palette by design — this is
+   a brand decision (see ARCHITECTURE.md), not a light/dark-mode default,
+   so there's deliberately no prefers-color-scheme override here. */
+:root {
+  --bg: #12131A;
+  --surface: #181D26;
+  --surface-raised: #242A35;
+  --accent-marigold: #E8A33D;
+  --accent-rose: #D65F7A;
+  --text: #F1EEE6;
+  --text-muted: #8B8D98;
+  --border: #2E3040;
+
+  --font-display: var(--font-oswald);
+  --font-body: var(--font-inter);
+  --font-mono-brand: var(--font-jetbrains-mono);
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+}
