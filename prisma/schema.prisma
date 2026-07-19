@@ -8,6 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // url moved to prisma.config.ts (Prisma 7+)
 }
 
 enum TagCategory {
@@ -179,4 +180,3 @@ model UserInteraction {
   @@index([createdAt])
   @@map("user_interactions")
 }
-
