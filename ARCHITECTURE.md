@@ -60,11 +60,14 @@ architecture:
 /                     Home — mood-first entry point
   ?mood=longing,revenge   URL-driven filter state (shareable, bookmarkable)
 /title/[id]           Detail page — editorial order, honest match scores
+/search?q=            Free-text results — name/synopsis/language match
 ```
 
-Two routes, on purpose. A dedicated `/search` results page for free-text
-queries is a known near-term gap (see Roadmap) — not built yet because
-the mood-chip entry point covers the primary discovery path first.
+Three routes, on purpose. `/search` is a plain `<form method="GET">`
+(see `SearchBar.tsx`) rather than a client-side fetch — the browser
+does the navigation itself, so the results page stays a Server
+Component with zero extra client JS, same as everywhere else in this
+app.
 
 ## Component hierarchy
 
@@ -75,8 +78,12 @@ app/
                             sections in Suspense boundaries
   title/[id]/page.tsx       Server Component — title + reactions + availability
                             + similar titles, all fetched server-side
+  search/page.tsx           Server Component — reads ?q=, Prisma `contains`
+                            match on name/synopsis/language (mode: insensitive)
 
 components/
+  SearchBar.tsx              Server Component — plain <form method="GET">,
+                            no client JS; browser navigates to /search?q=
   MoodChipBar.tsx           Client Component — only one that needs client JS;
                             toggles chips by pushing to the URL, not local state
   TitleCard.tsx             Server Component — Link-based nav, phone-bezel card
@@ -123,11 +130,12 @@ database while giving TypeScript idiomatic camelCase field names.
   and reactions yourself (`prisma/seed.ts` has a working example).
 - **User accounts** — session-cookie-based interaction tracking works
   without them.
-- **A `/search` results page** for free-text queries.
-- **Search-query logging** — `logSearch()` in `actions.ts` is a stub;
-  the `UserInteraction` schema requires a `titleId`, so a search event
-  (which isn't about one title) needs either a nullable `titleId` or a
-  separate `SearchLog` model. Deferred until you actually need the data.
+- **Search-query logging** — `logSearch()` in `actions.ts` is still a
+  stub (console.log only). `/search` itself is built, but the query
+  isn't persisted: the `UserInteraction` schema requires a `titleId`,
+  so a search event (which isn't about one title) needs either a
+  nullable `titleId` or a separate `SearchLog` model. Deferred until
+  you actually need the data.
 
 ## Next build candidates, in likely order
 
@@ -137,10 +145,11 @@ database while giving TypeScript idiomatic camelCase field names.
 2. Seed 50-100 real titles with real reactions — this is the point
    where you find out if the taxonomy actually holds up against real
    content, not hypothetical categories.
-3. Build the `/search` results page for free-text queries.
-4. Add lightweight admin auth (even a single shared password behind a
+3. Add lightweight admin auth (even a single shared password behind a
    cookie is fine at this stage) before letting anyone else touch the
    Server Actions.
+4. Persist search queries (see the `logSearch()` gap above) once you
+   want that data feeding the recommendation flywheel.
 5. Once `UserInteraction` has real volume: blend a behavioral similarity
    term into `computeMatchScore()` and let the score graduate from
    "tag-overlap similar" to genuinely "personalized."

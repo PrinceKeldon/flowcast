@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { MOOD_CHIPS, DEFAULT_MOODS, findChip } from "@/lib/moodChips";
 import { MoodChipBar } from "@/components/MoodChipBar";
+import { SearchBar } from "@/components/SearchBar";
 import { TitleRail } from "@/components/TitleRail";
 
 export const dynamic = "force-dynamic"; // trending/rails depend on live interaction data
@@ -23,6 +24,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <h1 className="mb-7 max-w-xl font-[var(--font-display)] text-4xl font-semibold uppercase text-[var(--text)]">
           What do you want to feel tonight?
         </h1>
+        <SearchBar />
         <MoodChipBar />
       </header>
 
