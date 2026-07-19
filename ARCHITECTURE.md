@@ -99,8 +99,14 @@ lib/
   matching.ts                Honest match-score algorithm + getSimilarTitles()
   session.ts                 Anonymous session cookie (interaction tracking
                               without requiring accounts)
+  admin.ts                   Single-password admin gate — isAdminSession(),
+                              requireAdmin(), login/logout Server Actions
   actions.ts                 All Server Actions — interaction logging + admin
-                              mutations (create title, add availability/reaction)
+                              mutations (create title, add availability/reaction),
+                              each gated by requireAdmin()
+
+admin/login/page.tsx        Password form (Client Component, useActionState)
+admin/page.tsx               Protected landing — redirects to /login if no session
 ```
 
 **Why so few Client Components:** almost everything is server-rendered.
@@ -121,15 +127,20 @@ database while giving TypeScript idiomatic camelCase field names.
 
 ## What's deliberately NOT built yet
 
-- **Auth on admin Server Actions** (`createTitle`, `addAvailability`,
-  `addReaction` in `actions.ts`) — fine while you're the only one
-  calling them; add a check before anyone else gets access.
+- **Real accounts for admin** — `lib/admin.ts` is a single shared
+  `ADMIN_PASSWORD` behind an httpOnly cookie, not a users table. Fine
+  for one person; move to real accounts before more than one person
+  needs access, or before the admin mutations do anything higher-stakes
+  than title curation.
+- **An actual admin data-entry form** — `/admin` confirms you're logged
+  in but doesn't yet expose a UI for `createTitle`/`addAvailability`/
+  `addReaction`; call those from `prisma/seed.ts` or a script for now.
 - **Personalized (behavioral) match scoring** — needs real interaction
   volume first. The honest v1 score is tag-overlap only.
 - **Producer self-serve submission** — start by seeding/curating titles
   and reactions yourself (`prisma/seed.ts` has a working example).
-- **User accounts** — session-cookie-based interaction tracking works
-  without them.
+- **User accounts (for visitors)** — session-cookie-based interaction
+  tracking works without them.
 - **Search-query logging** — `logSearch()` in `actions.ts` is still a
   stub (console.log only). `/search` itself is built, but the query
   isn't persisted: the `UserInteraction` schema requires a `titleId`,
@@ -141,15 +152,14 @@ database while giving TypeScript idiomatic camelCase field names.
 
 1. Get a real Postgres database (Vercel Postgres, Supabase, or Neon all
    work fine with Prisma), run `npx prisma migrate dev`, then
-   `npm run db:seed` to load the 6 example titles.
+   `npm run db:seed` to load the 6 example titles, and set
+   `ADMIN_PASSWORD` so `/admin` actually unlocks.
 2. Seed 50-100 real titles with real reactions — this is the point
    where you find out if the taxonomy actually holds up against real
-   content, not hypothetical categories.
-3. Add lightweight admin auth (even a single shared password behind a
-   cookie is fine at this stage) before letting anyone else touch the
-   Server Actions.
-4. Persist search queries (see the `logSearch()` gap above) once you
+   content, not hypothetical categories. Build the `/admin` data-entry
+   form if calling Server Actions by hand gets old.
+3. Persist search queries (see the `logSearch()` gap above) once you
    want that data feeding the recommendation flywheel.
-5. Once `UserInteraction` has real volume: blend a behavioral similarity
+4. Once `UserInteraction` has real volume: blend a behavioral similarity
    term into `computeMatchScore()` and let the score graduate from
    "tag-overlap similar" to genuinely "personalized."

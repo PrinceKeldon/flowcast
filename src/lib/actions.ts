@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
+import { requireAdmin } from "@/lib/admin";
 import type { InteractionAction, Prisma } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 
@@ -55,8 +56,9 @@ export async function logSearch(query: string, filters: Record<string, unknown>)
 }
 
 // ------------------------------------------------------------
-// Admin mutations — NO AUTH YET. Wire an admin check here before
-// exposing this to anyone but yourself. See ARCHITECTURE.md.
+// Admin mutations — gated by requireAdmin() (see lib/admin.ts). Each
+// throws "Not authorized" if there's no valid admin session cookie.
+// Still just a single shared password, on purpose — see ARCHITECTURE.md.
 // ------------------------------------------------------------
 export async function createTitle(data: {
   name: string;
@@ -71,6 +73,7 @@ export async function createTitle(data: {
   coverImageUrl?: string;
   isPublished?: boolean;
 }) {
+  await requireAdmin();
   const title = await prisma.title.create({ data });
   revalidatePath("/");
   return title;
@@ -85,7 +88,8 @@ export async function addAvailability(
     priceAmountCents?: number;
     regionAvailability?: string[];
   }
-) {
+  ) {
+  await requireAdmin();
   const availability = await prisma.availability.create({
     data: { titleId, ...data },
   });
@@ -96,7 +100,8 @@ export async function addAvailability(
 export async function addReaction(
   titleId: string,
   data: { emoji: string; quoteText: string; authorHandle?: string; displayOrder?: number }
-) {
+  ) {
+  await requireAdmin();
   const reaction = await prisma.titleReaction.create({
     data: { titleId, ...data },
   });
