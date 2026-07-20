@@ -2,7 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { logWatchClick } from "@/lib/actions";
-import type { Availability } from "@/generated/prisma";
+import type { Availability } from "@/generated/prisma/client";
 
 export function WatchButton({ availability, titleId }: { availability: Availability; titleId: string }) {
   const handleClick = () => {

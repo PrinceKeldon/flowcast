@@ -8,7 +8,7 @@ import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { TitleRail } from "@/components/TitleRail";
-import type { Availability } from "@/generated/prisma";
+import type { Availability } from "@/generated/prisma/client";
 
 interface TitleDetailPageProps {
   params: Promise<{ id: string }>;

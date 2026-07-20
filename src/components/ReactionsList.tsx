@@ -1,4 +1,4 @@
-import type { TitleReaction } from "@/generated/prisma";
+import type { TitleReaction } from "@/generated/prisma/client";
 
 export function ReactionsList({ reactions }: { reactions: TitleReaction[] }) {
   if (reactions.length === 0) return null;

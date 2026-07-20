@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { requireAdmin } from "@/lib/admin";
-import type { InteractionAction, Prisma } from "@/generated/prisma";
+import type { InteractionAction, Prisma } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 
 /**

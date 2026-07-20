@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Title } from "@/generated/prisma";
+import type { Title } from "@/generated/prisma/client";
 
 /**
  * V1 "honest match score."

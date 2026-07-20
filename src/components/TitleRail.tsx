@@ -1,4 +1,4 @@
-import type { Title } from "@/generated/prisma";
+import type { Title } from "@/generated/prisma/client";
 import { TitleCard } from "@/components/TitleCard";
 
 interface TitleRailProps {

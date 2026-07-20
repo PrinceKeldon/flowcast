@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Title } from "@/generated/prisma";
+import type { Title } from "@/generated/prisma/client";
 
 interface TitleCardProps {
   title: Pick<Title, "id" | "name" | "language" | "moodTags" | "coverImageUrl" | "episodeCount" | "pacing">;
