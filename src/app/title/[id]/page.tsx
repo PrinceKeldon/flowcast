@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getSimilarTitles } from "@/lib/matching";
 import { logInteraction } from "@/lib/actions";
+import { isAdminSession } from "@/lib/admin";
 import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
 import { InsightsPanel } from "@/components/InsightsPanel";
@@ -26,6 +27,16 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
   });
 
   if (!title) notFound();
+
+  // Drafts are only visible to admins (e.g. previewing before publish,
+  // via the "View public page" link in /admin/titles/[id]). Everyone
+  // else gets a 404 — same as if the title didn't exist. Every other
+  // query in this app (home rails, /search, matching.ts) already
+  // filters isPublished: true; this is the one direct-by-id lookup,
+  // so it needs its own check rather than inheriting one from a where
+  // clause.
+  const isAdmin = await isAdminSession();
+  if (!title.isPublished && !isAdmin) notFound();
 
   // Fire-and-forget view logging — doesn't block the render.
   logInteraction({ titleId: title.id, action: "viewed_detail" });
@@ -52,6 +63,11 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
         </div>
 
         <div>
+          {!title.isPublished && (
+            <p className="mb-2 inline-block rounded-full bg-[var(--accent-rose)]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-[var(--bg)]">
+              Draft — only visible to you
+            </p>
+          )}
           <p className="mb-1.5 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">
             {title.language.toUpperCase()} · {title.status} · {title.episodeCount ?? "?"} episodes
           </p>
