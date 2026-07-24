@@ -48,11 +48,22 @@ export async function logWatchClick(titleId: string, availabilityId: string, pla
   });
 }
 
-export async function logSearch(query: string, filters: Record<string, unknown>) {
-  // titleId is required by the schema; searches aren't tied to one title,
-  // so this is intentionally skipped until the schema grows a nullable
-  // search-log table. Tracked here as a known gap — see ARCHITECTURE.md.
-  console.log("search logged (not yet persisted):", query, filters);
+/**
+ * Persists a free-text search query. Separate table from
+ * UserInteraction (see schema.prisma docstring on SearchLog) since a
+ * search isn't tied to one titleId. Fire-and-forget, same as
+ * logInteraction — a lost search log shouldn't break the results page.
+ */
+export async function logSearch(query: string, filters: Prisma.InputJsonValue = {}, resultCount?: number) {
+  try {
+    const sessionId = await getSessionId();
+    await prisma.searchLog.create({
+      data: { sessionId, query, filters, resultCount },
+    });
+  } catch (err) {
+    console.error("Failed to log search", err);
+    // Intentionally swallowed — see docstring.
+  }
 }
 
 // ------------------------------------------------------------

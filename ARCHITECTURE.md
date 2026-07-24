@@ -101,12 +101,16 @@ lib/
                               without requiring accounts)
   admin.ts                   Single-password admin gate — isAdminSession(),
                               requireAdmin(), login/logout Server Actions
+  adminForms.ts               FormData → typed-args adapters around the
+                              actions.ts mutations, for use as <form action=>
   actions.ts                 All Server Actions — interaction logging + admin
                               mutations (create title, add availability/reaction),
                               each gated by requireAdmin()
 
 admin/login/page.tsx        Password form (Client Component, useActionState)
-admin/page.tsx               Protected landing — redirects to /login if no session
+admin/page.tsx               Protected landing — lists titles, links to each
+admin/titles/new/page.tsx    Create-title form
+admin/titles/[id]/page.tsx   Title detail — add availability/reaction forms
 ```
 
 **Why so few Client Components:** almost everything is server-rendered.
@@ -118,12 +122,13 @@ by default.
 
 ## Data model
 
-See `prisma/schema.prisma`. Six models: `Title`, `Availability`,
-`Producer`, `TagDefinition`, `TitleReaction`, `UserInteraction`. Ported
-directly from the earlier Postgres/FastAPI design — same reasoning
-applies (see inline comments in the schema file), just expressed as
-Prisma models with `@map`/`@@map` to keep snake_case in the actual
-database while giving TypeScript idiomatic camelCase field names.
+See `prisma/schema.prisma`. Seven models: `Title`, `Availability`,
+`Producer`, `TagDefinition`, `TitleReaction`, `UserInteraction`,
+`SearchLog`. Ported directly from the earlier Postgres/FastAPI design —
+same reasoning applies (see inline comments in the schema file), just
+expressed as Prisma models with `@map`/`@@map` to keep snake_case in
+the actual database while giving TypeScript idiomatic camelCase field
+names.
 
 ## What's deliberately NOT built yet
 
@@ -132,34 +137,45 @@ database while giving TypeScript idiomatic camelCase field names.
   for one person; move to real accounts before more than one person
   needs access, or before the admin mutations do anything higher-stakes
   than title curation.
-- **An actual admin data-entry form** — `/admin` confirms you're logged
-  in but doesn't yet expose a UI for `createTitle`/`addAvailability`/
-  `addReaction`; call those from `prisma/seed.ts` or a script for now.
-- **Personalized (behavioral) match scoring** — needs real interaction
-  volume first. The honest v1 score is tag-overlap only.
-- **Producer self-serve submission** — start by seeding/curating titles
-  and reactions yourself (`prisma/seed.ts` has a working example).
+- **Producer self-serve submission** — start by curating titles and
+  reactions yourself via `/admin/titles/new`, or `prisma/seed.ts` for
+  bulk loads.
 - **User accounts (for visitors)** — session-cookie-based interaction
   tracking works without them.
-- **Search-query logging** — `logSearch()` in `actions.ts` is still a
-  stub (console.log only). `/search` itself is built, but the query
-  isn't persisted: the `UserInteraction` schema requires a `titleId`,
-  so a search event (which isn't about one title) needs either a
-  nullable `titleId` or a separate `SearchLog` model. Deferred until
-  you actually need the data.
+- **Fully personalized match scoring** — `matching.ts` now blends a
+  behavioral (session co-occurrence) term into `computeMatchScore()`,
+  but only once a title has ≥5 qualifying sessions
+  (`MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL`); below that it's still pure
+  tag-overlap. It's also still title-to-title similarity, not
+  personalized to the *viewing* user's own history — that's the next
+  real step once there's enough per-user signal to justify it.
 
-## Next build candidates, in likely order
+## Roadmap status
 
-1. Get a real Postgres database (Vercel Postgres, Supabase, or Neon all
-   work fine with Prisma), run `npx prisma migrate dev`, then
-   `npm run db:seed` to load the 6 example titles, and set
-   `ADMIN_PASSWORD` so `/admin` actually unlocks.
-2. Seed 50-100 real titles with real reactions — this is the point
-   where you find out if the taxonomy actually holds up against real
-   content, not hypothetical categories. Build the `/admin` data-entry
-   form if calling Server Actions by hand gets old.
-3. Persist search queries (see the `logSearch()` gap above) once you
-   want that data feeding the recommendation flywheel.
-4. Once `UserInteraction` has real volume: blend a behavioral similarity
-   term into `computeMatchScore()` and let the score graduate from
-   "tag-overlap similar" to genuinely "personalized."
+All four items from the original "next build candidates" list are
+done as of this writing:
+
+1. ✅ Real Postgres database — Supabase project `flowcast`
+   (`eu-central-1`), schema applied, 6 example titles seeded.
+2. ✅ Admin data-entry form — `/admin/titles/new` (create) and
+   `/admin/titles/[id]` (add availability/reaction), both routed
+   through `adminForms.ts` → the `requireAdmin()`-gated mutations in
+   `actions.ts`.
+3. ✅ Search-query persistence — `SearchLog` model, `logSearch()`
+   actually writes to it now.
+4. ✅ Behavioral blend on match score — see `matching.ts` docstring.
+
+Next candidates, roughly in order of what unlocks the most:
+
+1. Seed 50-100 real titles with real reactions via `/admin/titles/new`
+   — this is the point where you find out if the taxonomy actually
+   holds up against real content, not hypothetical categories.
+2. Once there's real per-*session* browsing history (not just
+   per-title aggregate), consider whether personalizing to the
+   viewing user's own history is worth the added complexity and the
+   UI-honesty rewrite that comes with it (the score copy would need
+   to change from "N% match with X" to something claiming personal
+   relevance).
+3. Real accounts for admin once more than one person needs access.
+4. Producer self-serve submission once there's enough volume that
+   curating everything yourself doesn't scale.

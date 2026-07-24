@@ -30,10 +30,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       })
     : [];
 
-  // Fire-and-forget — see actions.ts docstring on why this isn't
-  // persisted yet (UserInteraction requires a titleId, a search isn't
-  // tied to one). Tracked as a known gap in ARCHITECTURE.md.
-  if (query) logSearch(query, {});
+  // Fire-and-forget — now persisted to SearchLog (see schema.prisma).
+  if (query) logSearch(query, {}, results.length);
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14 pb-20">

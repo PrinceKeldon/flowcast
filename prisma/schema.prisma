@@ -180,3 +180,20 @@ model UserInteraction {
   @@index([createdAt])
   @@map("user_interactions")
 }
+
+// Persists free-text search queries from /search. Deliberately separate
+// from UserInteraction rather than a nullable titleId there — a search
+// isn't about one title, and keeping the FK on UserInteraction NOT NULL
+// keeps that table's existing queries simple. See ARCHITECTURE.md.
+model SearchLog {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  query       String
+  resultCount Int?     @map("result_count")
+  filters     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([query])
+  @@map("search_logs")
+}

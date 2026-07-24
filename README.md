@@ -16,7 +16,7 @@ don't get accidentally undone in a future edit.
 ```bash
 npm install                              # triggers `prisma generate` via postinstall
 cp .env.example .env                     # point DATABASE_URL at a real Postgres instance
-npx prisma migrate dev --name init       # creates tables from schema.prisma
+npx prisma migrate deploy                # applies the migration in prisma/migrations/
 npm run db:seed                          # loads 6 example titles + reactions
 npm run dev
 ```
