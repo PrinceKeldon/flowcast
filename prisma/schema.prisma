@@ -45,8 +45,10 @@ enum InteractionAction {
   searched
 }
 
-// Controlled vocabulary for tags — the taxonomy asset. Versioned via
-// is_active so it can evolve without breaking already-tagged titles.
+// The taxonomy asset. Rows are seeded up front (see prisma/seed.ts)
+// and also auto-registered by createTitle() as new tag values show
+// up — see the comment on Title.tropeTags. Versioned via is_active so
+// it can evolve without breaking already-tagged titles.
 model TagDefinition {
   id          String      @id @default(uuid())
   category    TagCategory
@@ -85,8 +87,11 @@ model Title {
   language          String
   countryOfOrigin   String?     @map("country_of_origin")
 
-  // Taxonomy — see TagDefinition for the controlled vocabulary these
-  // values must come from (validated at the application layer).
+  // Taxonomy — normalized and auto-registered into TagDefinition by
+  // createTitle() (see lib/actions.ts): typing a new tag grows the
+  // vocabulary rather than being rejected, so TagDefinition stays a
+  // living record of what's actually in use, not a closed enum you'd
+  // need to edit code to extend.
   tropeTags         String[]    @map("trope_tags")
   moodTags          String[]    @map("mood_tags")
   pacing            Pacing?

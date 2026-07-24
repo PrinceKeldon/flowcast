@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { requireAdmin } from "@/lib/admin";
-import type { InteractionAction, Prisma } from "@/generated/prisma/client";
+import type { InteractionAction, Prisma, TagCategory } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -71,6 +71,47 @@ export async function logSearch(query: string, filters: Prisma.InputJsonValue = 
 // throws "Not authorized" if there's no valid admin session cookie.
 // Still just a single shared password, on purpose — see ARCHITECTURE.md.
 // ------------------------------------------------------------
+
+function normalizeTagValue(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+function labelFromValue(value: string): string {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * Auto-creates any TagDefinition rows that don't exist yet for the
+ * given category/values, so the taxonomy grows to match what's
+ * actually being tagged rather than silently accepting values that
+ * never show up in TagDefinition — previously the "controlled
+ * vocabulary" ARCHITECTURE.md describes wasn't enforced anywhere.
+ * Existing definitions (and their label/description/isActive) are
+ * left untouched — this only fills in what's missing.
+ */
+async function ensureTagDefinitions(category: TagCategory, values: string[]): Promise<void> {
+  const unique = Array.from(new Set(values.filter(Boolean)));
+  if (unique.length === 0) return;
+
+  await Promise.all(
+    unique.map((value) =>
+      prisma.tagDefinition.upsert({
+        where: { category_value: { category, value } },
+        update: {},
+        create: { category, value, label: labelFromValue(value) },
+      })
+    )
+  );
+}
+
 export async function createTitle(data: {
   name: string;
   synopsis?: string;
@@ -85,7 +126,20 @@ export async function createTitle(data: {
   isPublished?: boolean;
 }) {
   await requireAdmin();
-  const title = await prisma.title.create({ data });
+
+  const tropeTags = data.tropeTags.map(normalizeTagValue).filter(Boolean);
+  const moodTags = data.moodTags.map(normalizeTagValue).filter(Boolean);
+  const castType = data.castType ? normalizeTagValue(data.castType) : undefined;
+
+  await Promise.all([
+    ensureTagDefinitions("trope", tropeTags),
+    ensureTagDefinitions("mood", moodTags),
+    castType ? ensureTagDefinitions("cast_type", [castType]) : Promise.resolve(),
+  ]);
+
+  const title = await prisma.title.create({
+    data: { ...data, tropeTags, moodTags, castType },
+  });
   revalidatePath("/");
   return title;
 }

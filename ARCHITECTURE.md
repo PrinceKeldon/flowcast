@@ -179,3 +179,35 @@ Next candidates, roughly in order of what unlocks the most:
 3. Real accounts for admin once more than one person needs access.
 4. Producer self-serve submission once there's enough volume that
    curating everything yourself doesn't scale.
+
+## Audit fixes (post-roadmap)
+
+A full pass over the codebase turned up a few issues, since fixed:
+
+- **Draft-title leak** — `/title/[id]` was the one direct-by-id query
+  that didn't filter `isPublished: true` like every other query does.
+  Now 404s for non-admins; admins see a "Draft — only visible to you"
+  badge instead. `generateMetadata()` on the same route enforces the
+  identical check independently, since it runs outside the page
+  component and would otherwise leak a draft's name/synopsis into
+  `<head>`/OG tags for link-preview bots even while the page 404s.
+- **Next.js CVEs** — bumped `16.2.10 → 16.2.11`, clearing the core
+  advisories (Server Action DoS, SSRF, cache confusion, middleware
+  bypass). Remaining `npm audit` noise is from `postcss`/`sharp`
+  bundled inside Next's own `node_modules`; npm's advisory range for
+  those is too broad to be actionable (its suggested "fix" is
+  downgrading to a years-old Next version).
+- **Tag taxonomy now actually enforced** — `createTitle()` normalizes
+  trope/mood/cast-type values and auto-registers any new ones into
+  `TagDefinition` via `ensureTagDefinitions()`. Previously
+  `TagDefinition` was written by the seed script but never read
+  anywhere, so a typoed tag would save silently and just never match
+  anything in `MoodChipBar` or the match-score tag-overlap logic.
+- **Per-title SEO/social metadata** — `title/[id]/page.tsx` now has
+  `generateMetadata()` (title, description, OpenGraph, Twitter Card),
+  and the root layout uses a title template (`%s · Kilig`) so child
+  routes don't need to repeat the site suffix. The Prisma call is
+  shared between `generateMetadata` and the page component via
+  React's `cache()`, so it only runs once per request.
+- Removed `fix.sh`, a one-time script whose patch had already landed
+  and been committed.

@@ -57,6 +57,11 @@ export default async function NewTitlePage() {
           <input id="moodTags" name="moodTags" placeholder="high_drama, longing" className={inputClass} />
         </div>
 
+        <div>
+          <label className={labelClass} htmlFor="castType">Cast type</label>
+          <input id="castType" name="castType" placeholder="unknown_cast" className={inputClass} />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass} htmlFor="pacing">Pacing</label>

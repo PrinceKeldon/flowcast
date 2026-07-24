@@ -22,9 +22,27 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+const SITE_NAME = "Kilig";
+const SITE_DESCRIPTION = "Emotion-first discovery for vertical drama. What do you want to feel tonight?";
+
 export const metadata: Metadata = {
-  title: "Kilig — find your next obsession",
-  description: "Emotion-first discovery for vertical drama. What do you want to feel tonight?",
+  title: {
+    default: "Kilig — find your next obsession",
+    // Child routes (e.g. title/[id]'s generateMetadata) set title to
+    // just the title name; Next.js composes it against this template
+    // automatically, so "The Light Between Oceans" becomes
+    // "The Light Between Oceans · Kilig" without repeating the suffix
+    // in every generateMetadata call.
+    template: "%s · Kilig",
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    siteName: SITE_NAME,
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+  },
 };
 
 export default function RootLayout({

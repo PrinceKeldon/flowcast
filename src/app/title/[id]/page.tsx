@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { cache } from "react";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getSimilarTitles } from "@/lib/matching";
@@ -15,16 +17,55 @@ interface TitleDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function TitleDetailPage({ params }: TitleDetailPageProps) {
-  const { id } = await params;
-
-  const title = await prisma.title.findUnique({
+// React's cache() dedupes this within a single request — generateMetadata
+// and the page component below both call it with the same id, but Prisma
+// only actually runs once per request instead of twice.
+const getTitle = cache((id: string) =>
+  prisma.title.findUnique({
     where: { id },
     include: {
       availability: { where: { isActive: true } },
       reactions: { orderBy: { displayOrder: "asc" } },
     },
-  });
+  })
+);
+
+export async function generateMetadata({ params }: TitleDetailPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const title = await getTitle(id);
+
+  // Same draft-privacy rule as the page body below, applied
+  // separately: generateMetadata runs independently of the page
+  // component, so without this a draft's name/synopsis would still
+  // leak into <head> and OG tags — visible to link-preview bots
+  // (Slack, iMessage, Twitter) and page-source viewers — even though
+  // the page itself 404s for non-admins. Returning {} here falls back
+  // to the root layout's generic metadata, matching the 404 behavior.
+  if (!title || (!title.isPublished && !(await isAdminSession()))) return {};
+
+  const description = title.synopsis ?? "Emotion-first discovery for vertical drama.";
+
+  return {
+    title: title.name,
+    description,
+    openGraph: {
+      title: title.name,
+      description,
+      type: "website",
+      images: title.coverImageUrl ? [{ url: title.coverImageUrl }] : undefined,
+    },
+    twitter: {
+      card: title.coverImageUrl ? "summary_large_image" : "summary",
+      title: title.name,
+      description,
+      images: title.coverImageUrl ? [title.coverImageUrl] : undefined,
+    },
+  };
+}
+
+export default async function TitleDetailPage({ params }: TitleDetailPageProps) {
+  const { id } = await params;
+  const title = await getTitle(id);
 
   if (!title) notFound();
 

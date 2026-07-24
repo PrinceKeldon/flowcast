@@ -38,6 +38,7 @@ export async function createTitleFromForm(formData: FormData) {
     tropeTags: splitTags(str(formData, "tropeTags")),
     moodTags: splitTags(str(formData, "moodTags")),
     pacing,
+    castType: optionalStr(formData, "castType"),
     episodeCount: episodeCountRaw ? Number(episodeCountRaw) : undefined,
     coverImageUrl: optionalStr(formData, "coverImageUrl"),
     isPublished: formData.get("isPublished") === "on",
