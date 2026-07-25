@@ -115,6 +115,51 @@ async function getBehavioralOverlap(
   return scores;
 }
 
+export interface TagAlignment {
+  value: string;
+  label: string;
+  fraction: number;
+}
+
+function humanizeTagValue(value: string): string {
+  // Small, deliberate duplication of the label-casing logic in
+  // actions.ts's labelFromValue() — that file has a top-level
+  // "use server" directive, so every export must be an async Server
+  // Action; a plain sync helper can't be imported from it here.
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * "Taxonomy signal" — for each of the reference title's own tags, what
+ * share of its similar-titles set also has that exact tag. Grounded
+ * entirely in the candidate list getSimilarTitles() already scored, so
+ * it's not a new query or a fabricated confidence number: "4 of 6
+ * similar titles also share this trope" is literally countable from
+ * data already on the page. Complements the single blended matchScore
+ * by showing which specific tags are actually doing the work, rather
+ * than asking the person to trust one percentage.
+ */
+export function computeTagAlignment(
+  referenceTags: string[],
+  similar: { title: Pick<Title, "tropeTags" | "moodTags"> }[],
+  field: "tropeTags" | "moodTags"
+): TagAlignment[] {
+  const total = similar.length;
+  if (total === 0) return [];
+
+  return referenceTags
+    .map((value) => {
+      const count = similar.filter((s) => s.title[field].includes(value)).length;
+      return { value, label: humanizeTagValue(value), fraction: count / total };
+    })
+    .filter((t) => t.fraction > 0)
+    .sort((a, b) => b.fraction - a.fraction);
+}
+
 export async function getSimilarTitles(titleId: string, limit = 6) {
   const reference = await prisma.title.findUnique({ where: { id: titleId } });
   if (!reference) return [];

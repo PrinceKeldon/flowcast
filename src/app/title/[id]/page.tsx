@@ -4,12 +4,13 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSimilarTitles } from "@/lib/matching";
+import { getSimilarTitles, computeTagAlignment } from "@/lib/matching";
 import { logInteraction } from "@/lib/actions";
 import { isAdminSession } from "@/lib/admin";
 import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
 import { InsightsPanel } from "@/components/InsightsPanel";
+import { TaxonomySignal } from "@/components/TaxonomySignal";
 import { TitleRail } from "@/components/TitleRail";
 import type { Availability } from "@/generated/prisma/client";
 
@@ -83,6 +84,8 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
   logInteraction({ titleId: title.id, action: "viewed_detail" });
 
   const similar = await getSimilarTitles(title.id, 6);
+  const tropeAlignment = computeTagAlignment(title.tropeTags, similar, "tropeTags");
+  const moodAlignment = computeTagAlignment(title.moodTags, similar, "moodTags");
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14 pb-20">
@@ -131,6 +134,12 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
           <ReactionsList reactions={title.reactions} />
 
           <InsightsPanel tropeTags={title.tropeTags} moodTags={title.moodTags} pacing={title.pacing} />
+
+          <TaxonomySignal
+            tropeAlignment={tropeAlignment}
+            moodAlignment={moodAlignment}
+            basedOnCount={similar.length}
+          />
         </div>
       </div>
 

@@ -42,7 +42,12 @@ architecture:
    card inside a "More like this" rail tied to a specific reference
    title) — never an unexplained bare percentage. See the docstring in
    that file for the exact formula and how to evolve it once real
-   interaction-behavior data exists.
+   interaction-behavior data exists. `TaxonomySignal.tsx` extends this:
+   instead of asking the person to trust one blended number, it shows
+   which specific tags are doing the work — for each of the title's own
+   tags, what share of the "More like this" set also carries it. No new
+   query, no fabricated confidence score — `computeTagAlignment()` just
+   counts across the same candidate list already fetched for the rail.
 
 3. **Reactions before taxonomy.** The detail page shows curated "why
    people love it" quotes (`TitleReaction` model) before any tag chips —
@@ -90,6 +95,8 @@ components/
   TitleRail.tsx             Server Component — horizontal scroll wrapper
   ReactionsList.tsx         Server Component — "why people love it" quotes
   InsightsPanel.tsx         Server Component — native <details>, no client JS
+  TaxonomySignal.tsx        Server Component — per-tag alignment bars, native
+                            <details>; see computeTagAlignment() in matching.ts
   WatchButton.tsx           Client Component — needs onClick to fire a Server
                             Action (log click) then window.open() the deep link
 
