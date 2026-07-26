@@ -9,6 +9,24 @@ interface TitleCardProps {
   matchScore?: number;
 }
 
+// Original gradient + type treatment for titles without licensed cover
+// art yet (see ARCHITECTURE.md — real art should come from platform
+// partners via Availability, not be generated or scraped). Picked
+// deterministically per title id so the same title always gets the
+// same treatment, and neighboring cards in a rail read as visually
+// distinct rather than one repeated gray placeholder.
+const FALLBACK_GRADIENTS = [
+  "bg-gradient-to-br from-[#12131A] via-[#3a2a1f] to-[#E8A33D]",
+  "bg-gradient-to-br from-[#12131A] via-[#3a1a24] to-[#D65F7A]",
+  "bg-gradient-to-br from-[#12131A] via-[#2a1c30] to-[#D65F7A]",
+  "bg-gradient-to-br from-[#12131A] via-[#332417] to-[#E8A33D]",
+];
+
+function pickGradient(id: string): string {
+  const sum = id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return FALLBACK_GRADIENTS[sum % FALLBACK_GRADIENTS.length];
+}
+
 export function TitleCard({ title, matchScore }: TitleCardProps) {
   return (
     <Link
@@ -20,8 +38,10 @@ export function TitleCard({ title, matchScore }: TitleCardProps) {
           // eslint-disable-next-line @next/next/no-img-element -- external, unoptimized source URLs from producers
           <img src={title.coverImageUrl} alt={title.name} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--surface)] to-black font-[var(--font-display)] text-4xl text-[var(--text-muted)]">
-            {title.name.slice(0, 1)}
+          <div className={`flex h-full w-full items-start p-2.5 ${pickGradient(title.id)}`}>
+            <p className="font-[var(--font-display)] text-base font-bold uppercase leading-[1.05] text-[#F1EEE6]">
+              {title.name}
+            </p>
           </div>
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 to-transparent" />

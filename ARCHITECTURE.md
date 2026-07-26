@@ -218,3 +218,41 @@ A full pass over the codebase turned up a few issues, since fixed:
   React's `cache()`, so it only runs once per request.
 - Removed `fix.sh`, a one-time script whose patch had already landed
   and been committed.
+- **`db:seed` was silently connecting to the wrong database** —
+  `npm run db:seed` called `tsx prisma/seed.ts` directly, bypassing
+  Prisma's CLI entirely. `prisma.config.ts` loads `.env` via
+  `process.loadEnvFile()`, but only when Prisma's CLI executes that
+  config file first; a bare `tsx` invocation never triggers it, so
+  `DATABASE_URL` was `undefined` and `node-postgres` silently fell
+  back to its own default (local socket, OS username as both user and
+  database name) instead of erroring loudly. Fixed by routing through
+  `prisma db seed`, which loads the config first — same as
+  `prisma migrate deploy` already did correctly.
+
+## Homepage visual pass
+
+Two real gaps, not a "needs redesign" problem — the dark/marigold/rose
+palette was already the intended look, it just wasn't showing up:
+
+- **`TitleCard.tsx` had no color for titles without licensed cover
+  art** — the fallback was a flat gray gradient with a single letter.
+  Every seeded title lacks `coverImageUrl` (real art should come from
+  platform partners, not be generated — see the Data model section),
+  so in practice every card looked identical and colorless. Replaced
+  with a deterministic (per title id) gradient pulled from the actual
+  brand palette plus the full title name overlaid, so cards read as
+  intentional and visually distinct from each other even before any
+  real artwork exists.
+- **`MoodChipBar.tsx` only showed color on the active chip** — every
+  chip at rest was the same flat gray regardless of type, so the
+  whole selector read as monochrome until you clicked something. Now
+  trope chips are marigold-tinted and mood chips are rose-tinted even
+  at rest, extending the same dual-accent rule `TaxonomySignal.tsx`
+  already uses for trope vs. mood alignment bars.
+- **First-open could show zero cards depending on the mood-chip
+  overlap** — the homepage previously only rendered Trending (always
+  empty pre-launch, needs real interaction volume) and whichever mood
+  rails happened to match. Added an unconditional "New on Kilig" rail
+  between them, ordered by `createdAt`, that shows as long as at least
+  one title is published — regardless of trending data or which mood
+  chips are active.

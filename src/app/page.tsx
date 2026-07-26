@@ -33,12 +33,31 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </Suspense>
 
       <Suspense fallback={<p className="text-[var(--text-muted)]">Loading...</p>}>
+        <NewestRail />
+      </Suspense>
+
+      <Suspense fallback={<p className="text-[var(--text-muted)]">Loading...</p>}>
         {chipsToShow.map((chip) => (
           <MoodRail key={chip.value} chip={chip} />
         ))}
       </Suspense>
     </main>
   );
+}
+
+async function NewestRail() {
+  // Trending needs real interaction volume and is empty pre-launch;
+  // the mood rails depend on which chips happen to be selected and
+  // can, in principle, come up empty for an unlucky combination. This
+  // rail has neither dependency — as long as at least one title is
+  // published, first-open never renders a blank page below the header.
+  const titles = await prisma.title.findMany({
+    where: { isPublished: true },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+
+  return <TitleRail eyebrow="New on Kilig" titles={titles} />;
 }
 
 async function TrendingRail() {

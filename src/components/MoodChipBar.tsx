@@ -46,17 +46,26 @@ export function MoodChipBar() {
       {MOOD_CHIPS.map((chip) => {
         const Icon = ICONS[chip.icon];
         const isActive = activeMoods.includes(chip.value);
+        // Trope chips read marigold, mood chips read rose — the same
+        // dual-accent rule TaxonomySignal already uses for trope vs
+        // mood alignment bars. Full literal class strings on both
+        // branches (not an interpolated CSS var name) because
+        // Tailwind's build-time scanner needs the exact class text
+        // present in source to generate it — a runtime-interpolated
+        // class name silently produces no CSS at all.
+        const isTrope = chip.type === "trope";
+        const buttonClass = isActive
+          ? isTrope
+            ? "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent-marigold)] border-[var(--accent-marigold)] text-[var(--bg)]"
+            : "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent-rose)] border-[var(--accent-rose)] text-[var(--bg)]"
+          : isTrope
+            ? "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors bg-[var(--surface)] border-[var(--border)] text-[var(--text)] hover:border-[var(--accent-marigold)]"
+            : "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors bg-[var(--surface)] border-[var(--border)] text-[var(--text)] hover:border-[var(--accent-rose)]";
+        const iconClass = isActive ? "" : isTrope ? "text-[var(--accent-marigold)]" : "text-[var(--accent-rose)]";
+
         return (
-          <button
-            key={chip.value}
-            onClick={() => toggleMood(chip.value)}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors
-              ${isActive
-                ? "bg-[var(--accent-rose)] border-[var(--accent-rose)] text-[var(--bg)]"
-                : "bg-[var(--surface)] border-[var(--border)] text-[var(--text)] hover:border-[var(--accent-rose)]"
-              }`}
-          >
-            <Icon size={16} aria-hidden="true" />
+          <button key={chip.value} onClick={() => toggleMood(chip.value)} className={buttonClass}>
+            <Icon size={16} aria-hidden="true" className={iconClass} />
             {chip.label}
           </button>
         );
