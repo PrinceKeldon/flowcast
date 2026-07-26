@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { logSearch } from "@/lib/actions";
 import { SearchBar } from "@/components/SearchBar";
+import { SearchLogger } from "@/components/SearchLogger";
 import { TitleCard } from "@/components/TitleCard";
 
 export const dynamic = "force-dynamic"; // results depend on live query params
@@ -30,11 +30,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       })
     : [];
 
-  // Fire-and-forget — now persisted to SearchLog (see schema.prisma).
-  if (query) logSearch(query, {}, results.length);
-
   return (
     <main className="mx-auto max-w-6xl px-6 py-14 pb-20">
+      {query && <SearchLogger query={query} resultCount={results.length} />}
       <Link
         href="/"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent-marigold)]"

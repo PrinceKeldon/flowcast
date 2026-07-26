@@ -103,6 +103,11 @@ components/
                             <details>; see computeTagAlignment() in matching.ts
   WatchButton.tsx           Client Component — needs onClick to fire a Server
                             Action (log click) then window.open() the deep link
+  ViewLogger.tsx             Client Component, renders null — fires
+                            logInteraction() on mount via useEffect instead of
+                            during the page's render body. See "Cookie writes"
+                            note below.
+  SearchLogger.tsx           Same pattern as ViewLogger.tsx, for logSearch()
 
 lib/
   prisma.ts                 Singleton Prisma client (dev hot-reload safe)
@@ -275,3 +280,27 @@ palette was already the intended look, it just wasn't showing up:
   distinguishing accent color reads more like real cover art typography.
 - Rail cards were a fixed 132px, sized for a mobile viewport
   regardless of screen size. Now `132px → 160px (sm) → 190px (lg)`.
+
+## Cookie writes only happen from real Server Action calls
+
+`logInteraction()` and `logSearch()` both call `getSessionId()`
+(`lib/session.ts`), which sets a cookie on a visitor's first
+interaction. Next.js only allows cookie *mutation* inside an actual
+Server Action invocation or Route Handler — not during a Server
+Component's render, even when the function being called is itself
+marked `"use server"`. Calling a Server Action function directly from
+a page's render body is just a plain async function call as far as
+that restriction is concerned; it doesn't go through the request
+lifecycle that makes cookie writes legal.
+
+`title/[id]/page.tsx` and `search/page.tsx` originally called
+`logInteraction()`/`logSearch()` directly in their render bodies —
+worked most of the time (existing sessions just read the cookie), but
+threw `Cookies can only be modified in a Server Action or Route
+Handler` for any visitor without one yet. Fixed by moving both calls
+into tiny Client Components (`ViewLogger.tsx`, `SearchLogger.tsx`)
+that fire the same Server Action from a `useEffect` on mount instead —
+that IS a genuine action invocation, same as `WatchButton.tsx`'s
+`onClick` already correctly does. If you add another fire-and-forget
+log call anywhere, route it through a Client Component the same way
+rather than calling it inline during a page's render.
