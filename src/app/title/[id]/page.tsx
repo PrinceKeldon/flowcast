@@ -11,6 +11,7 @@ import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { TaxonomySignal } from "@/components/TaxonomySignal";
+import { TitleCoverArt } from "@/components/TitleCoverArt";
 import { TitleRail } from "@/components/TitleRail";
 import type { Availability } from "@/generated/prisma/client";
 
@@ -96,14 +97,7 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
 
       <div className="grid grid-cols-1 gap-9 sm:grid-cols-[220px_1fr]">
         <div className="aspect-[9/16] overflow-hidden rounded-2xl bg-black">
-          {title.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={title.coverImageUrl} alt={title.name} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--surface)] to-black font-[var(--font-display)] text-6xl text-[var(--text-muted)]">
-              {title.name.slice(0, 1)}
-            </div>
-          )}
+          <TitleCoverArt title={title} titleTextClassName="text-3xl" />
         </div>
 
         <div>

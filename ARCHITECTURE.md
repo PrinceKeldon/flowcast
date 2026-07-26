@@ -92,6 +92,10 @@ components/
   MoodChipBar.tsx           Client Component — only one that needs client JS;
                             toggles chips by pushing to the URL, not local state
   TitleCard.tsx             Server Component — Link-based nav, phone-bezel card
+  TitleCoverArt.tsx          Server Component — shared cover-art fallback (see
+                            below); used by both TitleCard and the detail-page
+                            hero so the gradient treatment can't drift out of
+                            sync between them again
   TitleRail.tsx             Server Component — horizontal scroll wrapper
   ReactionsList.tsx         Server Component — "why people love it" quotes
   InsightsPanel.tsx         Server Component — native <details>, no client JS
@@ -256,3 +260,18 @@ palette was already the intended look, it just wasn't showing up:
   between them, ordered by `createdAt`, that shows as long as at least
   one title is published — regardless of trending data or which mood
   chips are active.
+
+**Follow-up round**, after seeing this in the browser for real:
+
+- The gradient fallback above only got applied to `TitleCard.tsx` (the
+  small rail cards) — the detail page's own hero image had an
+  identical but separately-written fallback that never got the fix,
+  so it still showed the old flat gray box with one letter. Extracted
+  both into a shared `TitleCoverArt.tsx` so this exact drift — two
+  copies of the same fallback silently diverging — can't happen a
+  third time.
+- Overlaid title text changed from off-white to marigold, since white
+  text is where most of the page's copy already reads, and a
+  distinguishing accent color reads more like real cover art typography.
+- Rail cards were a fixed 132px, sized for a mobile viewport
+  regardless of screen size. Now `132px → 160px (sm) → 190px (lg)`.
