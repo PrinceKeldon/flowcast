@@ -1,4 +1,4 @@
-# Kilig (flowcast) — Architecture
+# Kilig — Architecture
 
 ## Starting point
 
@@ -171,8 +171,12 @@ names.
 All four items from the original "next build candidates" list are
 done as of this writing:
 
-1. ✅ Real Postgres database — Supabase project `flowcast`
-   (`eu-central-1`), schema applied, 6 example titles seeded.
+1. ✅ Real Postgres database — a Supabase project, schema applied,
+   6 example titles seeded. (Note: the original Supabase project
+   created earlier in this build, named `flowcast`, is orphaned —
+   the actual `DATABASE_URL` in use points at a different, later
+   project. Fine to delete the `flowcast` one if you want to tidy up
+   your Supabase org; nothing depends on it.)
 2. ✅ Admin data-entry form — `/admin/titles/new` (create) and
    `/admin/titles/[id]` (add availability/reaction), both routed
    through `adminForms.ts` → the `requireAdmin()`-gated mutations in
@@ -304,3 +308,42 @@ that IS a genuine action invocation, same as `WatchButton.tsx`'s
 `onClick` already correctly does. If you add another fire-and-forget
 log call anywhere, route it through a Client Component the same way
 rather than calling it inline during a page's render.
+
+## Ship-readiness pass
+
+- **Renamed `package.json`/`package-lock.json` from `flowcast` to
+  `kilig`.** The GitHub repo URL itself is still `.../flowcast` —
+  intentionally not renamed (see the note at the top of this repo's
+  README for why that's fine).
+- **Per-title and site-wide OG images** — `title/[id]/opengraph-image.tsx`
+  redirects to the real `coverImageUrl` when one exists, otherwise
+  generates the same gradient+title treatment as `TitleCoverArt.tsx`
+  via `next/og`'s `ImageResponse` (re-expressed in plain CSS, since
+  Satori doesn't read Tailwind classes). `src/app/opengraph-image.tsx`
+  covers every other route with a generic branded card. Previously,
+  every shared link had zero preview image — every seed title lacks
+  `coverImageUrl`, so this was silently broken for 100% of current
+  content, not an edge case.
+- **`robots.ts`** disallows `/admin` from being indexed. **`sitemap.ts`**
+  lists every published title. Both read `NEXT_PUBLIC_SITE_URL`, which
+  isn't set yet since the domain isn't registered — they degrade
+  gracefully (empty sitemap, no sitemap line in robots.txt) rather
+  than guessing a domain. Set it once you've registered one.
+- **`not-found.tsx`** — branded 404 instead of Next's default, for the
+  (now fairly common) case of an unpublished title or a bad link.
+- **`icon.tsx`** replaces the default Next.js favicon with a generated
+  Kilig mark, same `ImageResponse` technique as the OG images.
+- **A deliberate delay on failed admin logins** (`admin.ts`) — cheap
+  brute-force mitigation appropriate for a single-shared-password
+  gate; see the comment there for what this does and doesn't protect
+  against, and when it'd be worth a real rate limiter instead.
+
+**Still open, needs a human decision, not a code fix:**
+- No `LICENSE` file in the repo.
+- The actual domain (`.tv` under the VeeReel umbrella, or a `kilig.*`
+  alternative) isn't registered yet — `NEXT_PUBLIC_SITE_URL` and the
+  Vercel deploy's production domain both depend on that.
+- Full `next build` still hasn't been verified end-to-end from this
+  sandbox (blocked reaching `binaries.prisma.sh` and Google Fonts) —
+  worth confirming via Vercel's own build, which has normal internet
+  access.

@@ -1,4 +1,11 @@
-# Kilig (flowcast)
+# Kilig
+
+> This repo's package name is `kilig`. The GitHub repo URL itself is
+> still `github.com/PrinceKeldon/flowcast` — `flowcast` was this
+> project's original working name before "Kilig" was settled on as
+> the actual product name; the repo slug was never renamed to match,
+> which is fine (plenty of products' repo/domain infra doesn't match
+> their consumer-facing name). Just don't take the URL as the brand.
 
 Emotion-first discovery for vertical drama — "Netflix without hosting."
 Users pick a feeling, not a genre; the app surfaces titles that match,

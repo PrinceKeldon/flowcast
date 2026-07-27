@@ -66,6 +66,16 @@ export async function loginAdminAction(
     return { error: "ADMIN_PASSWORD isn't set on the server yet." };
   }
   if (!supplied || !timingSafeStringEqual(supplied, password)) {
+    // Deliberate delay on every failed attempt. This is a single
+    // shared password with no lockout/accounts system (see docstring
+    // above) — a real rate limiter would need persistent state (a DB
+    // table keyed by IP, or an external store), which is more
+    // infrastructure than this admin gate is meant to carry. A flat
+    // delay doesn't stop a determined, highly-parallel attacker, but
+    // it kills casual single-threaded guessing at near-zero cost,
+    // which is the realistic threat model for a low-traffic admin
+    // panel. Revisit if this ever needs to hold up to more than that.
+    await new Promise((resolve) => setTimeout(resolve, 750));
     return { error: "Wrong password." };
   }
 

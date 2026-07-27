@@ -1,7 +1,8 @@
 {
-  "name": "flowcast",
+  "name": "kilig",
   "version": "0.1.0",
   "private": true,
+  "description": "Kilig — emotion-first discovery for vertical drama. Find your next obsession by mood and trope, not just genre.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

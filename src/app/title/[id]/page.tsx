@@ -47,21 +47,16 @@ export async function generateMetadata({ params }: TitleDetailPageProps): Promis
 
   const description = title.synopsis ?? "Emotion-first discovery for vertical drama.";
 
+  // Image is intentionally NOT set here — opengraph-image.tsx in this
+  // same route segment is the single source of truth for og:image /
+  // twitter:image, whether that's a redirect to a real coverImageUrl
+  // or a generated gradient fallback. Keeping image logic in one place
+  // avoids two mechanisms disagreeing about what to show.
   return {
     title: title.name,
     description,
-    openGraph: {
-      title: title.name,
-      description,
-      type: "website",
-      images: title.coverImageUrl ? [{ url: title.coverImageUrl }] : undefined,
-    },
-    twitter: {
-      card: title.coverImageUrl ? "summary_large_image" : "summary",
-      title: title.name,
-      description,
-      images: title.coverImageUrl ? [title.coverImageUrl] : undefined,
-    },
+    openGraph: { title: title.name, description, type: "website" },
+    twitter: { card: "summary_large_image", title: title.name, description },
   };
 }
 
