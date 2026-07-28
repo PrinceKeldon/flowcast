@@ -90,7 +90,7 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
 
       <div className="grid grid-cols-1 gap-9 sm:grid-cols-[220px_1fr]">
         <div className="aspect-[9/16] overflow-hidden rounded-2xl bg-black">
-          <TitleCoverArt title={title} titleTextClassName="text-3xl" />
+          <TitleCoverArt title={title} titleTextClassName="text-3xl" showTitleOverlay={false} />
         </div>
 
         <div>

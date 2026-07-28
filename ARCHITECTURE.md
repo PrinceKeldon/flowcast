@@ -347,3 +347,37 @@ rather than calling it inline during a page's render.
   sandbox (blocked reaching `binaries.prisma.sh` and Google Fonts) —
   worth confirming via Vercel's own build, which has normal internet
   access.
+
+## Mobile pass
+
+Real on-device testing surfaced four issues no amount of desktop
+DevTools simulation would have caught:
+
+- **The whole page could scroll horizontally**, not just the rails —
+  something (never fully isolated) was overflowing the viewport
+  width, and with no `overflow-x-hidden` safety net anywhere, that
+  overflow propagated all the way up to the page itself. Felt like
+  "the whole page moves sideways as one plate" and could cut off text
+  requiring horizontal scroll to read. Fixed with `overflow-x-hidden`
+  on both `<html>` and `<body>` in `layout.tsx` — a page-level
+  backstop that holds regardless of which element is the actual
+  source, rather than chasing down one specific culprit.
+- **Rails didn't feel gesture-isolated from the page** — a horizontal
+  swipe on a rail could get ambiguously read as a vertical page-scroll
+  gesture too if it wasn't perfectly horizontal. Added `touch-pan-x`
+  to each rail's scroll container (`TitleRail.tsx`) so the browser
+  scopes that element to horizontal panning only and hands vertical
+  gestures off to the page — this is what actually delivers "each row
+  scrolls independently," more than scroll-snap alone did.
+- **Cards were sized smallest-first** — `132px` was the *base* (mobile)
+  width, with `sm:`/`lg:` making them bigger on larger screens. Exactly
+  backwards for a product that's mobile-first in practice: bumped to
+  `164px → 180px (sm) → 200px (lg)` for real legibility on an actual
+  phone, at the cost of fewer cards visible per row.
+- **Duplicate title on the detail-page hero, mobile only** — the
+  gradient fallback's overlaid title sits directly above the page's
+  real `<h1>` once the layout collapses to one column below `sm:`,
+  reading as the name printed twice in a row. `TitleCoverArt.tsx` now
+  takes a `showTitleOverlay` prop (default `true`, so rail cards are
+  unaffected); the detail-page hero passes `false` since a real
+  heading already sits right below it.

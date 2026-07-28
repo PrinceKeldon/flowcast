@@ -26,9 +26,19 @@ interface TitleCoverArtProps {
   // the same static-scanner reason FALLBACK_GRADIENTS entries are
   // written out in full below.
   titleTextClassName?: string;
+  // The detail-page hero sits directly above a real <h1> with the
+  // same name — on mobile, where the layout stacks to one column,
+  // showing the overlaid title there too reads as the name printed
+  // twice in a row. Rail cards have no adjacent heading, so they
+  // default to showing it.
+  showTitleOverlay?: boolean;
 }
 
-export function TitleCoverArt({ title, titleTextClassName = "text-base" }: TitleCoverArtProps) {
+export function TitleCoverArt({
+  title,
+  titleTextClassName = "text-base",
+  showTitleOverlay = true,
+}: TitleCoverArtProps) {
   if (title.coverImageUrl) {
     // eslint-disable-next-line @next/next/no-img-element -- external, unoptimized source URLs from producers
     return <img src={title.coverImageUrl} alt={title.name} className="h-full w-full object-cover" />;
@@ -36,11 +46,13 @@ export function TitleCoverArt({ title, titleTextClassName = "text-base" }: Title
 
   return (
     <div className={`flex h-full w-full items-start p-2.5 ${pickGradient(title.id)}`}>
-      <p
-        className={`font-[var(--font-display)] font-bold uppercase leading-[1.05] text-[var(--accent-marigold)] ${titleTextClassName}`}
-      >
-        {title.name}
-      </p>
+      {showTitleOverlay && (
+        <p
+          className={`font-[var(--font-display)] font-bold uppercase leading-[1.05] text-[var(--accent-marigold)] ${titleTextClassName}`}
+        >
+          {title.name}
+        </p>
+      )}
     </div>
   );
 }
