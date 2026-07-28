@@ -17,7 +17,7 @@ export function TitleCard({ title, matchScore }: TitleCardProps) {
       className="block w-[164px] shrink-0 snap-start rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 pb-2.5 transition-transform hover:-translate-y-1 sm:w-[180px] lg:w-[200px]"
     >
       <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-black">
-        <TitleCoverArt title={title} titleTextClassName="text-lg lg:text-xl" />
+        <TitleCoverArt title={title} titleTextClassName="text-lg lg:text-xl" showTitleOverlay={false} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 to-transparent" />
 
         {typeof matchScore === "number" && (
@@ -37,7 +37,7 @@ export function TitleCard({ title, matchScore }: TitleCardProps) {
           ))}
         </div>
       </div>
-      <p className="mt-2 font-[var(--font-display)] text-base leading-tight text-[var(--text)] lg:text-lg">
+      <p className="mt-2 font-[var(--font-display)] text-base leading-tight text-[var(--accent-rose)] lg:text-lg">
         {title.name}
       </p>
       <p className="mt-0.5 font-mono text-[11px] text-[var(--text-muted)]">

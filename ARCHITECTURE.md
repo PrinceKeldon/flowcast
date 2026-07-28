@@ -380,13 +380,18 @@ DevTools simulation would have caught:
   backwards for a product that's mobile-first in practice: bumped to
   `164px → 180px (sm) → 200px (lg)` for real legibility on an actual
   phone, at the cost of fewer cards visible per row.
-- **Duplicate title on the detail-page hero, mobile only** — the
-  gradient fallback's overlaid title sits directly above the page's
-  real `<h1>` once the layout collapses to one column below `sm:`,
-  reading as the name printed twice in a row. `TitleCoverArt.tsx` now
-  takes a `showTitleOverlay` prop (default `true`, so rail cards are
-  unaffected); the detail-page hero passes `false` since a real
-  heading already sits right below it.
+- **Duplicate title, both the detail-page hero and rail cards** — the
+  gradient fallback's overlaid title sat directly above a real heading
+  in both places: the detail-page `<h1>` (mobile only, once the layout
+  collapses to one column) and every `TitleCard`'s own caption below
+  the image (always, any viewport). `TitleCoverArt.tsx`'s
+  `showTitleOverlay` prop (default `true`) is now explicitly passed
+  `false` at both call sites —
+  `TitleCard.tsx` and the detail-page hero — since both already show
+  the name right next to the art. The caption on `TitleCard` switched
+  from `--text` (off-white) to `--accent-rose`, now that it's the only
+  title shown on the card and the image area no longer carries any
+  text of its own.
 - **The homepage `<h1>` got clipped, not just scrollable** —
   `overflow-x-hidden` (above) fixed the whole-page horizontal-scroll
   symptom, but it didn't fix whatever was actually overflowing — it
