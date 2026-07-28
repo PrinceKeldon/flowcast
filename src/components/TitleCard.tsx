@@ -14,7 +14,7 @@ export function TitleCard({ title, matchScore }: TitleCardProps) {
   return (
     <Link
       href={`/title/${title.id}`}
-      className="block w-[132px] shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 pb-2.5 transition-transform hover:-translate-y-1 sm:w-[160px] lg:w-[190px]"
+      className="block w-[132px] shrink-0 snap-start rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 pb-2.5 transition-transform hover:-translate-y-1 sm:w-[160px] lg:w-[190px]"
     >
       <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-black">
         <TitleCoverArt title={title} titleTextClassName="text-base lg:text-lg" />
