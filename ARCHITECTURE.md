@@ -388,10 +388,9 @@ DevTools simulation would have caught:
   `showTitleOverlay` prop (default `true`) is now explicitly passed
   `false` at both call sites —
   `TitleCard.tsx` and the detail-page hero — since both already show
-  the name right next to the art. The caption on `TitleCard` switched
-  from `--text` (off-white) to `--accent-rose`, now that it's the only
-  title shown on the card and the image area no longer carries any
-  text of its own.
+  the name right next to the art. (Tried switching the caption to
+  `--accent-rose` since it was now the only title on the card — reverted,
+  it dampened the homepage's overall mood. Stayed `--text`, off-white.)
 - **The homepage `<h1>` got clipped, not just scrollable** —
   `overflow-x-hidden` (above) fixed the whole-page horizontal-scroll
   symptom, but it didn't fix whatever was actually overflowing — it
