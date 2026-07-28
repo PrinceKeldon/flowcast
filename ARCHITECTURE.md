@@ -364,11 +364,17 @@ DevTools simulation would have caught:
   source, rather than chasing down one specific culprit.
 - **Rails didn't feel gesture-isolated from the page** — a horizontal
   swipe on a rail could get ambiguously read as a vertical page-scroll
-  gesture too if it wasn't perfectly horizontal. Added `touch-pan-x`
-  to each rail's scroll container (`TitleRail.tsx`) so the browser
-  scopes that element to horizontal panning only and hands vertical
-  gestures off to the page — this is what actually delivers "each row
-  scrolls independently," more than scroll-snap alone did.
+  gesture too if it wasn't perfectly horizontal. **Attempted fix,
+  reverted**: `touch-pan-x` on each rail's scroll container caused a
+  worse regression on real iOS Safari — the whole page's vertical
+  scroll could get stuck entirely, requiring a reload to recover. This
+  is a known real-world quirk of `touch-action` values other than
+  `auto`/`none`/`manipulation` combined with nested scrollables on
+  WebKit, not something visible in any simulator. `scroll-snap` alone
+  (still in place) is the safer bet for "feels like independent rows"
+  and doesn't carry this risk. Lesson: don't stack an unverifiable,
+  device-only-testable CSS change on top of something already working
+  without a way to confirm it before shipping it.
 - **Cards were sized smallest-first** — `132px` was the *base* (mobile)
   width, with `sm:`/`lg:` making them bigger on larger screens. Exactly
   backwards for a product that's mobile-first in practice: bumped to
@@ -381,3 +387,15 @@ DevTools simulation would have caught:
   takes a `showTitleOverlay` prop (default `true`, so rail cards are
   unaffected); the detail-page hero passes `false` since a real
   heading already sits right below it.
+- **The homepage `<h1>` got clipped, not just scrollable** —
+  `overflow-x-hidden` (above) fixed the whole-page horizontal-scroll
+  symptom, but it didn't fix whatever was actually overflowing — it
+  just turned "annoying sideways scroll" into "content silently cut
+  off and unreachable," which is worse. Added `break-words` to every
+  heading that renders variable-length content (the homepage
+  headline, and both places a title's own `name` is rendered as an
+  `<h1>`) as a hard guarantee against this class of bug, and removed
+  a vestigial `flex flex-col` from `<body>` (no footer ever used it —
+  it was create-next-app boilerplate) since flex containers are a
+  common source of exactly this kind of width-blowout quirk and it
+  wasn't accomplishing anything.

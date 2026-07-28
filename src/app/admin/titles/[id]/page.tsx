@@ -39,7 +39,7 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
       <p className="mb-1 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">
         {title.isPublished ? "Published" : "Draft"} · {title.language.toUpperCase()}
       </p>
-      <h1 className="mb-2 font-[var(--font-display)] text-2xl font-semibold uppercase text-[var(--text)]">
+      <h1 className="mb-2 break-words font-[var(--font-display)] text-2xl font-semibold uppercase text-[var(--text)]">
         {title.name}
       </h1>
       <Link

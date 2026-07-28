@@ -102,7 +102,7 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
           <p className="mb-1.5 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">
             {title.language.toUpperCase()} · {title.status} · {title.episodeCount ?? "?"} episodes
           </p>
-          <h1 className="mb-4 font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)]">
+          <h1 className="mb-4 break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)]">
             {title.name}
           </h1>
 

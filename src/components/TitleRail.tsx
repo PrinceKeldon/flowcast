@@ -16,7 +16,7 @@ export function TitleRail({ eyebrow, titles }: TitleRailProps) {
   return (
     <section className="mb-9">
       <p className="mb-3 font-mono text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{eyebrow}</p>
-      <div className="flex touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]">
         {titles.map((title) => (
           <TitleCard key={title.id} title={title} matchScore={title.matchScore} />
         ))}
