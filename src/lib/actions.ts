@@ -112,7 +112,7 @@ async function ensureTagDefinitions(category: TagCategory, values: string[]): Pr
   );
 }
 
-export async function createTitle(data: {
+interface TitleFields {
   name: string;
   synopsis?: string;
   language: string;
@@ -124,9 +124,15 @@ export async function createTitle(data: {
   episodeCount?: number;
   coverImageUrl?: string;
   isPublished?: boolean;
-}) {
-  await requireAdmin();
+}
 
+/**
+ * Normalizes tag fields and registers any new values into
+ * TagDefinition — shared by createTitle and updateTitle so both go
+ * through the same taxonomy-growing logic (see ensureTagDefinitions
+ * docstring above) rather than one of them silently skipping it.
+ */
+async function normalizeAndRegisterTags(data: TitleFields) {
   const tropeTags = data.tropeTags.map(normalizeTagValue).filter(Boolean);
   const moodTags = data.moodTags.map(normalizeTagValue).filter(Boolean);
   const castType = data.castType ? normalizeTagValue(data.castType) : undefined;
@@ -137,11 +143,39 @@ export async function createTitle(data: {
     castType ? ensureTagDefinitions("cast_type", [castType]) : Promise.resolve(),
   ]);
 
+  return { tropeTags, moodTags, castType };
+}
+
+export async function createTitle(data: TitleFields) {
+  await requireAdmin();
+  const { tropeTags, moodTags, castType } = await normalizeAndRegisterTags(data);
+
   const title = await prisma.title.create({
     data: { ...data, tropeTags, moodTags, castType },
   });
   revalidatePath("/");
   return title;
+}
+
+export async function updateTitle(id: string, data: TitleFields) {
+  await requireAdmin();
+  const { tropeTags, moodTags, castType } = await normalizeAndRegisterTags(data);
+
+  const title = await prisma.title.update({
+    where: { id },
+    data: { ...data, tropeTags, moodTags, castType },
+  });
+  revalidatePath("/");
+  revalidatePath(`/title/${id}`);
+  return title;
+}
+
+export async function deleteTitle(id: string) {
+  await requireAdmin();
+  // Availability, TitleReaction, and UserInteraction all cascade on
+  // titleId (see schema.prisma) — no orphaned rows left behind.
+  await prisma.title.delete({ where: { id } });
+  revalidatePath("/");
 }
 
 export async function addAvailability(
@@ -162,6 +196,32 @@ export async function addAvailability(
   return availability;
 }
 
+export async function updateAvailability(
+  id: string,
+  titleId: string,
+  data: {
+    platform: string;
+    deepLinkUrl: string;
+    priceModel: "free" | "pay_per_unlock" | "subscription" | "ad_supported";
+    priceAmountCents?: number;
+    regionAvailability?: string[];
+  }
+) {
+  await requireAdmin();
+  const availability = await prisma.availability.update({
+    where: { id },
+    data,
+  });
+  revalidatePath(`/title/${titleId}`);
+  return availability;
+}
+
+export async function deleteAvailability(id: string, titleId: string) {
+  await requireAdmin();
+  await prisma.availability.delete({ where: { id } });
+  revalidatePath(`/title/${titleId}`);
+}
+
 export async function addReaction(
   titleId: string,
   data: { emoji: string; quoteText: string; authorHandle?: string; displayOrder?: number }
@@ -172,4 +232,10 @@ export async function addReaction(
   });
   revalidatePath(`/title/${titleId}`);
   return reaction;
+}
+
+export async function deleteReaction(id: string, titleId: string) {
+  await requireAdmin();
+  await prisma.titleReaction.delete({ where: { id } });
+  revalidatePath(`/title/${titleId}`);
 }

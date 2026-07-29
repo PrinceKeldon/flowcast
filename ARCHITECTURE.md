@@ -120,13 +120,21 @@ lib/
   adminForms.ts               FormData → typed-args adapters around the
                               actions.ts mutations, for use as <form action=>
   actions.ts                 All Server Actions — interaction logging + admin
-                              mutations (create title, add availability/reaction),
-                              each gated by requireAdmin()
+                              mutations (full CRUD on Title, Availability,
+                              TitleReaction), each gated by requireAdmin()
+  fetchOgImage.ts             Server Action — pulls a cover image out of a
+                              page's og:image/twitter:image meta tags, for
+                              the "Fetch image from link" button in the
+                              admin title form. Admin-only, light SSRF guard
+                              (blocks loopback/private-network hosts).
 
 admin/login/page.tsx        Password form (Client Component, useActionState)
 admin/page.tsx               Protected landing — lists titles, links to each
 admin/titles/new/page.tsx    Create-title form
-admin/titles/[id]/page.tsx   Title detail — add availability/reaction forms
+admin/titles/[id]/page.tsx   Title detail — edit/delete title, per-item
+                              edit/delete on availability, per-item delete
+                              on reactions, plus the add forms for both
+admin/titles/[id]/edit/page.tsx  Edit-title form, pre-filled
 ```
 
 **Why so few Client Components:** almost everything is server-rendered.
@@ -403,3 +411,52 @@ DevTools simulation would have caught:
   it was create-next-app boilerplate) since flex containers are a
   common source of exactly this kind of width-blowout quirk and it
   wasn't accomplishing anything.
+
+## Cover-art fetch from a link
+
+`/admin/titles/new` and the edit form both have a "Fetch cover art
+from a link" field alongside the plain `coverImageUrl` input, backed
+by `fetchOgImage()`. It reads a page's `og:image`/`twitter:image` meta
+tags — the same mechanism link-preview bots use, not an LLM (the
+AI-auto-fill idea discussed earlier was deliberately shelved as
+premature for the MVP; this is the zero-new-dependency version of the
+same instinct). Known limitation: several source platforms are more
+app-native than web-native, so their public pages may not carry real
+metadata at all — when that happens the field just stays empty and
+the admin pastes a URL manually, same field either way.
+
+`CoverImageField.tsx` is the one place in the admin forms that's a
+Client Component rather than a plain `<form action=>` — it needs local
+state to hold the fetch result before the surrounding form submits,
+which a zero-JS server form can't do. Everything else in this section
+stays server-rendered.
+
+## Full CRUD on Title, Availability, and TitleReaction
+
+Every admin mutation used to be create-only — there was no way to fix
+a wrong deep link or a typo without deleting and re-seeding the whole
+title. Added:
+
+- **Title**: `/admin/titles/[id]/edit` (pre-filled form) and a
+  "Delete title" control on the detail page, behind a `<details>`
+  disclosure requiring an explicit second click on a clearly-labeled
+  destructive button — same zero-JS "are you sure" pattern the "+ Add"
+  forms already used, no `confirm()` dialog needed. Delete cascades
+  to that title's `Availability`, `TitleReaction`, and
+  `UserInteraction` rows at the DB level (see `schema.prisma`'s
+  `onDelete: Cascade`), so nothing orphaned is left behind.
+- **Availability**: per-item inline "Edit" (pre-filled, same disclosure
+  pattern) and "Delete" on `/admin/titles/[id]`. This was the specific
+  gap that prompted the whole pass — a wrong `deepLinkUrl` had no fix
+  except adding a second, correct entry alongside the broken one.
+- **TitleReaction**: per-item "Delete" only, not edit — a short quote
+  is about as much effort to delete-and-retype as to edit in place, so
+  edit-in-place wasn't worth the extra form for now. Easy to add later
+  if that judgment turns out wrong.
+
+`actions.ts` now shares tag normalization + `TagDefinition`
+registration between `createTitle` and `updateTitle` via
+`normalizeAndRegisterTags()`, so editing a title's tags goes through
+the identical taxonomy-growing logic as creating one — previously
+this only would have run once and an edit could have silently
+bypassed it if update had been added carelessly.
