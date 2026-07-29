@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { isAdminSession } from "@/lib/admin";
 import { createTitleFromForm } from "@/lib/adminForms";
+import { CoverImageField } from "@/components/admin/CoverImageField";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-marigold)] focus:outline-none";
@@ -78,10 +79,7 @@ export default async function NewTitlePage() {
           </div>
         </div>
 
-        <div>
-          <label className={labelClass} htmlFor="coverImageUrl">Cover image URL</label>
-          <input id="coverImageUrl" name="coverImageUrl" type="url" className={inputClass} />
-        </div>
+        <CoverImageField />
 
         <label className="flex items-center gap-2 text-sm text-[var(--text)]">
           <input type="checkbox" name="isPublished" className="accent-[var(--accent-marigold)]" />
