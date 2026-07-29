@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { isAdminSession, logoutAdminAction } from "@/lib/admin";
+import { isAdminSession } from "@/lib/admin";
+import { logoutAdminAction } from "@/lib/admin-actions";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminPage() {
