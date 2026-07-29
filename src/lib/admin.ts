@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { createHash, timingSafeEqual } from "crypto";
 
 const ADMIN_COOKIE = "kilig_admin";
@@ -49,51 +48,4 @@ export async function requireAdmin(): Promise<void> {
   }
 }
 
-export interface LoginFormState {
-  error?: string;
-}
 
-export async function loginAdminAction(
-  _prevState: LoginFormState,
-  formData: FormData
-): Promise<LoginFormState> {
-  "use server";
-
-  const password = process.env.ADMIN_PASSWORD;
-  const supplied = String(formData.get("password") ?? "");
-
-  if (!password) {
-    return { error: "ADMIN_PASSWORD isn't set on the server yet." };
-  }
-  if (!supplied || !timingSafeStringEqual(supplied, password)) {
-    // Deliberate delay on every failed attempt. This is a single
-    // shared password with no lockout/accounts system (see docstring
-    // above) — a real rate limiter would need persistent state (a DB
-    // table keyed by IP, or an external store), which is more
-    // infrastructure than this admin gate is meant to carry. A flat
-    // delay doesn't stop a determined, highly-parallel attacker, but
-    // it kills casual single-threaded guessing at near-zero cost,
-    // which is the realistic threat model for a low-traffic admin
-    // panel. Revisit if this ever needs to hold up to more than that.
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    return { error: "Wrong password." };
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(ADMIN_COOKIE, sessionToken(password), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-    path: "/",
-  });
-
-  redirect("/admin");
-}
-
-export async function logoutAdminAction(): Promise<void> {
-  "use server";
-  const cookieStore = await cookies();
-  cookieStore.delete(ADMIN_COOKIE);
-  redirect("/admin/login");
-}
