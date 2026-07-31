@@ -122,11 +122,12 @@ lib/
   actions.ts                 All Server Actions — interaction logging + admin
                               mutations (full CRUD on Title, Availability,
                               TitleReaction), each gated by requireAdmin()
-  fetchOgImage.ts             Server Action — pulls a cover image out of a
-                              page's og:image/twitter:image meta tags, for
-                              the "Fetch image from link" button in the
-                              admin title form. Admin-only, light SSRF guard
-                              (blocks loopback/private-network hosts).
+  fetchTitleMetadata.ts       Server Action — pulls name, synopsis, cover
+                              image, and detected platform out of a page's
+                              own preview meta tags, for the "Fetch details
+                              from a link" field in the admin title form.
+                              Admin-only, light SSRF guard (blocks
+                              loopback/private-network hosts).
 
 admin/login/page.tsx        Password form (Client Component, useActionState)
 admin/page.tsx               Protected landing — lists titles, links to each
@@ -412,24 +413,36 @@ DevTools simulation would have caught:
   common source of exactly this kind of width-blowout quirk and it
   wasn't accomplishing anything.
 
-## Cover-art fetch from a link
+## Fetch title details from a link
 
-`/admin/titles/new` and the edit form both have a "Fetch cover art
-from a link" field alongside the plain `coverImageUrl` input, backed
-by `fetchOgImage()`. It reads a page's `og:image`/`twitter:image` meta
-tags — the same mechanism link-preview bots use, not an LLM (the
-AI-auto-fill idea discussed earlier was deliberately shelved as
-premature for the MVP; this is the zero-new-dependency version of the
-same instinct). Known limitation: several source platforms are more
-app-native than web-native, so their public pages may not carry real
-metadata at all — when that happens the field just stays empty and
-the admin pastes a URL manually, same field either way.
+`/admin/titles/new` and the edit form both open with "Fetch details
+from a link," backed by `fetchTitleMetadata()` (originally
+`fetchOgImage()` — cover-art-only; expanded to cover name, synopsis,
+and cover image together, one button, after the narrower version
+proved out). Reads a page's own preview metadata — `og:title`,
+`og:description`, `og:image`/`twitter:image`, `og:site_name` — the
+same mechanism link-preview bots use, not an LLM (the AI-auto-fill
+idea discussed earlier stays shelved as premature for the MVP; this
+is the zero-new-dependency version of the same instinct). Also
+surfaces a "Detected platform" note from `og:site_name` when present —
+informational only, since availability is added as a separate step
+after the title itself is saved, not something this form can prefill
+directly.
 
-`CoverImageField.tsx` is the one place in the admin forms that's a
-Client Component rather than a plain `<form action=>` — it needs local
-state to hold the fetch result before the surrounding form submits,
-which a zero-JS server form can't do. Everything else in this section
-stays server-rendered.
+Known limitation, unchanged from the original version: several source
+platforms are more app-native than web-native, so their public pages
+may carry little or no usable metadata — when that happens the fields
+just stay empty (or keep whatever was already typed) and the admin
+fills them in manually. Every fetched field is a first draft to
+review, not a final answer — a synopsis pulled from `og:description`
+is written for SEO/marketing, not necessarily Kilig's voice or length.
+
+`TitleDetailsFetcher.tsx` is the one place in the admin title forms
+that's a Client Component rather than a plain `<form action=>` — it
+needs local state to hold the fetch result (and let the admin freely
+edit it) before the surrounding form submits, which a zero-JS server
+form can't do on its own. Everything else in both forms stays
+server-rendered.
 
 ## Full CRUD on Title, Availability, and TitleReaction
 

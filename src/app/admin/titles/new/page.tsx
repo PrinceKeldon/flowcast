@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { isAdminSession } from "@/lib/admin";
 import { createTitleFromForm } from "@/lib/adminForms";
-import { CoverImageField } from "@/components/admin/CoverImageField";
+import { TitleDetailsFetcher } from "@/components/admin/TitleDetailsFetcher";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-marigold)] focus:outline-none";
@@ -27,15 +27,7 @@ export default async function NewTitlePage() {
       </h1>
 
       <form action={createTitleFromForm} className="flex flex-col gap-5">
-        <div>
-          <label className={labelClass} htmlFor="name">Name *</label>
-          <input id="name" name="name" required className={inputClass} />
-        </div>
-
-        <div>
-          <label className={labelClass} htmlFor="synopsis">Synopsis</label>
-          <textarea id="synopsis" name="synopsis" rows={3} className={inputClass} />
-        </div>
+        <TitleDetailsFetcher />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -78,8 +70,6 @@ export default async function NewTitlePage() {
             <input id="episodeCount" name="episodeCount" type="number" min={0} className={inputClass} />
           </div>
         </div>
-
-        <CoverImageField />
 
         <label className="flex items-center gap-2 text-sm text-[var(--text)]">
           <input type="checkbox" name="isPublished" className="accent-[var(--accent-marigold)]" />
