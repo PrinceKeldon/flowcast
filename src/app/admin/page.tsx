@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Radar } from "lucide-react";
 import { isAdminSession } from "@/lib/admin";
 import { logoutAdminAction } from "@/lib/admin-actions";
 import { prisma } from "@/lib/prisma";
@@ -32,13 +32,22 @@ export default async function AdminPage() {
         </form>
       </div>
 
-      <Link
-        href="/admin/titles/new"
-        className="mb-7 inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent-marigold)] px-4 py-2.5 text-sm font-semibold text-[var(--bg)] transition-opacity hover:opacity-90"
-      >
-        <Plus size={16} aria-hidden="true" />
-        New title
-      </Link>
+      <div className="mb-7 flex flex-wrap gap-3">
+        <Link
+          href="/admin/titles/new"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent-marigold)] px-4 py-2.5 text-sm font-semibold text-[var(--bg)] transition-opacity hover:opacity-90"
+        >
+          <Plus size={16} aria-hidden="true" />
+          New title
+        </Link>
+        <Link
+          href="/admin/discovery"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-colors hover:border-[var(--accent-marigold)]"
+        >
+          <Radar size={16} aria-hidden="true" />
+          Discovery
+        </Link>
+      </div>
 
       <p className="mb-3 font-mono text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
         Titles ({titles.length})
