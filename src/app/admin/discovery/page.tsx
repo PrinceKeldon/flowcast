@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { isAdminSession } from "@/lib/admin";
 import { getRegisteredSources } from "@/lib/discovery/mission";
 import { DiscoveryMissionRunner } from "@/components/admin/DiscoveryMissionRunner";
+import { TrendScoutPanel } from "@/components/admin/TrendScoutPanel";
 
 export default async function DiscoveryPage() {
   if (!(await isAdminSession())) redirect("/admin/login");
@@ -27,6 +28,8 @@ export default async function DiscoveryPage() {
         Run a mission against a source plugin. Every imported title lands unpublished — nothing goes live without
         being reviewed on its own title page first.
       </p>
+
+      <TrendScoutPanel />
 
       <DiscoveryMissionRunner sources={sources} />
     </main>
