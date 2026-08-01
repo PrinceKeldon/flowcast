@@ -37,10 +37,12 @@ export const dramaBoxPlugin: DiscoveryPlugin = {
     }
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature required by DiscoveryPlugin
   async discover(_request: DiscoveryRequest): Promise<DiscoveryItem[]> {
     throw new Error(UNAVAILABLE_MESSAGE);
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature required by DiscoveryPlugin
   async importTitle(_url: string): Promise<ImportResult> {
     throw new Error(UNAVAILABLE_MESSAGE);
   },

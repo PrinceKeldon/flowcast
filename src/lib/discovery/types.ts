@@ -31,7 +31,8 @@ export type DiscoveryMission =
   | "latest"
   | "genre"
   | "mood"
-  | "search";
+  | "search"
+  | "manualUrls";
 
 /** What to do when a discovered title looks like one we already have. */
 export type DuplicatePolicy = "skip" | "review" | "import";
@@ -64,6 +65,8 @@ export interface DiscoveryRequest {
   mood?: string;
   /** Required when mission === "search". */
   search?: string;
+  /** Required when mission === "manualUrls" — URLs an admin specifically chose, not auto-discovered. */
+  urls?: string[];
 
   duplicatePolicy: DuplicatePolicy;
   importMode: ImportMode;

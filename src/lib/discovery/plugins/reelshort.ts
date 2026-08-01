@@ -1,34 +1,27 @@
 /**
  * ReelShort (Crazy Maple Studio) discovery plugin.
  *
- * reelshort.com's public web catalogue is server-rendered plain HTML
- * (confirmed by fetching it directly — no JS execution needed) and is
- * the site's own promotional listing, not a paywalled or licensed
- * dataset — a legitimate discovery target, unlike verticaldrama.tv.
+ * discover() only supports mission "manualUrls" — an admin-chosen
+ * list of ReelShort links, not automated crawling of ReelShort's own
+ * shelf/listing pages. An earlier version of this file fetched
+ * https://www.reelshort.com/shelf/... and regex-extracted every
+ * /episodes/ link on it to enumerate a batch of titles automatically;
+ * that's scraping a platform's own catalog regardless of how
+ * politely it's implemented, almost certainly runs against
+ * ReelShort's Terms of Service (standard boilerplate against
+ * automated crawling on nearly every consumer platform), and is a
+ * direct risk to the exact relationship this product's "watch on"
+ * deep-linking depends on. Removed entirely, not left reachable
+ * behind a flag.
  *
- * URL shapes observed directly on the live site (2026-07-31):
- *   Shelf/listing page: https://www.reelshort.com/shelf/<slug>-<id>
- *   Title/episode page: https://www.reelshort.com/episodes/<encoded-path>
- * There is no separate "show page" distinct from the episode-1 URL —
- * the episode-1 link IS the canonical destination for a title, so
- * that's what's used as both the discovery item and the deep link.
+ * importTitle() is unchanged — fetching one page a human specifically
+ * chose, reading its own og:/twitter: meta tags, was never the
+ * problem; only automated multi-title enumeration was.
  */
 
 import type { DiscoveryItem, DiscoveryPlugin, DiscoveryRequest, ImportResult } from "../types";
-import { extractLinks, fetchHtml, fetchPageMeta } from "../webExtract";
+import { fetchPageMeta } from "../webExtract";
 import { buildResultFromMeta } from "./buildResult";
-
-const BASE = "https://www.reelshort.com";
-
-// Only the two shelves discoverable without knowing genre/mood slug
-// IDs ahead of time. "genre"/"mood"/"search" missions aren't wired up
-// yet — see the thrown error below rather than a wrong guess.
-const SHELF_BY_MISSION: Partial<Record<DiscoveryRequest["mission"], string>> = {
-  topCharts: `${BASE}/shelf/top-short-movies-dramas-51001122`,
-  latest: `${BASE}/shelf/new-release-short-movies-dramas-51001121`,
-};
-
-const EPISODE_HREF_PATTERN = /^\/episodes\//;
 
 export const reelShortPlugin: DiscoveryPlugin = {
   source: "ReelShort",
@@ -42,20 +35,17 @@ export const reelShortPlugin: DiscoveryPlugin = {
   },
 
   async discover(request: DiscoveryRequest): Promise<DiscoveryItem[]> {
-    const shelfUrl = SHELF_BY_MISSION[request.mission];
-    if (!shelfUrl) {
+    if (request.mission !== "manualUrls") {
       throw new Error(
-        `ReelShort plugin doesn't support mission "${request.mission}" yet — only "topCharts" and "latest" are wired to a known shelf URL.`
+        `ReelShort plugin only supports mission "manualUrls" — pass in the URLs an admin specifically chose. Automated discovery from ReelShort's own listing pages was deliberately removed (see this file's docstring).`
       );
     }
 
-    const html = await fetchHtml(shelfUrl);
-    if (!html) {
-      throw new Error(`Could not fetch ReelShort shelf page: ${shelfUrl}`);
-    }
-    const links = extractLinks(html, shelfUrl, EPISODE_HREF_PATTERN);
-
-    return links.map((titleUrl) => ({ titleUrl, source: "ReelShort" as const }));
+    const urls = request.urls ?? [];
+    return urls
+      .filter((url) => reelShortPlugin.supports(url))
+      .slice(0, request.quantity)
+      .map((titleUrl) => ({ titleUrl, source: "ReelShort" as const }));
   },
 
   async importTitle(url: string): Promise<ImportResult> {

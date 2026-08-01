@@ -153,23 +153,3 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
   if (!html) return null;
   return extractPageMeta(html, url);
 }
-
-/**
- * Pulls every unique absolute (or root-relative, resolved against
- * `base`) href matching `hrefPattern` out of raw HTML, in document
- * order. The generic "find candidate links" building block every
- * plugin's discover() uses against a listing/shelf page.
- */
-export function extractLinks(html: string, base: string, hrefPattern: RegExp): string[] {
-  const baseUrl = new URL(base);
-  const seen = new Set<string>();
-  const anchorRe = /<a\s[^>]*href=["']([^"']+)["']/gi;
-  let match: RegExpExecArray | null;
-  while ((match = anchorRe.exec(html)) !== null) {
-    const href = decodeEntities(match[1]);
-    if (!hrefPattern.test(href)) continue;
-    const resolved = resolveUrl(href, baseUrl);
-    if (resolved) seen.add(resolved);
-  }
-  return Array.from(seen);
-}

@@ -15,7 +15,7 @@ const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--accent-marigold)] focus:outline-none";
 const labelClass = "mb-1.5 block font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]";
 
-const MISSIONS: DiscoveryMission[] = ["topCharts", "latest", "genre", "mood", "search"];
+const MISSIONS: DiscoveryMission[] = ["manualUrls", "topCharts", "latest", "genre", "mood", "search"];
 const DUPLICATE_POLICIES: DuplicatePolicy[] = ["review", "skip", "import"];
 const IMPORT_MODES: ImportMode[] = ["draft", "publish"];
 
@@ -25,7 +25,8 @@ interface DiscoveryMissionRunnerProps {
 
 export function DiscoveryMissionRunner({ sources }: DiscoveryMissionRunnerProps) {
   const [source, setSource] = useState<DiscoverySource | "">(sources[0] ?? "");
-  const [mission, setMission] = useState<DiscoveryMission>("topCharts");
+  const [mission, setMission] = useState<DiscoveryMission>("manualUrls");
+  const [urlsText, setUrlsText] = useState("");
   const [quantity, setQuantity] = useState(10);
   const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>("review");
   const [importMode, setImportMode] = useState<ImportMode>("draft");
@@ -41,12 +42,21 @@ export function DiscoveryMissionRunner({ sources }: DiscoveryMissionRunnerProps)
       setError("Pick a source first.");
       return;
     }
+    const urls = urlsText
+      .split("\n")
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (mission === "manualUrls" && urls.length === 0) {
+      setError("Paste at least one URL first.");
+      return;
+    }
     startTransition(async () => {
       try {
         const runResult = await runMission({
           source,
           mission,
           quantity,
+          urls: mission === "manualUrls" ? urls : undefined,
           duplicatePolicy,
           importMode,
         });
@@ -89,9 +99,24 @@ export function DiscoveryMissionRunner({ sources }: DiscoveryMissionRunnerProps)
           </select>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Not every plugin supports every mission yet — an unsupported combination fails clearly rather than
-            guessing.
+            guessing. ReelShort and ShortMax only support manualUrls: paste links you&apos;ve specifically chosen,
+            rather than an automated crawl of their own listing pages.
           </p>
         </div>
+
+        {mission === "manualUrls" && (
+          <div className="col-span-2">
+            <label className={labelClass} htmlFor="urls">URLs (one per line)</label>
+            <textarea
+              id="urls"
+              rows={6}
+              value={urlsText}
+              onChange={(e) => setUrlsText(e.target.value)}
+              placeholder={"https://www.reelshort.com/episodes/...\nhttps://www.reelshort.com/episodes/..."}
+              className={inputClass}
+            />
+          </div>
+        )}
 
         <div>
           <label className={labelClass} htmlFor="quantity">Quantity</label>

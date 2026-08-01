@@ -473,3 +473,63 @@ registration between `createTitle` and `updateTitle` via
 the identical taxonomy-growing logic as creating one — previously
 this only would have run once and an edit could have silently
 bypassed it if update had been added carelessly.
+
+## Discovery Engine (`/admin/discovery`)
+
+A plugin-based system for importing multiple titles at once, landed
+in `e79c82b` and reworked immediately after in the same session. The
+architecture is genuinely good and worth understanding on its own
+terms before the policy correction below:
+
+- `lib/discovery/types.ts` — the shared contract. A `DiscoveryPlugin`
+  implements `supports(url)`, `discover(request)` (returns candidate
+  URLs), and `importTitle(url)` (fetches one page, returns a
+  structured result). Everything downstream of `discover()` —
+  duplicate detection, draft creation, the live summary UI — only
+  ever deals in URLs and doesn't care where the list came from.
+- `lib/discovery/registry.ts` + `registry-init.ts` — plugins register
+  themselves by source name; nothing else imports a plugin module
+  directly. Adding a source is "write a plugin file, add one line."
+- `lib/discovery/plugins/` — one file per source. `dramabox.ts` is a
+  deliberate non-implementation: a direct fetch against DramaBox's
+  own `/browse` page returned a confirmed bot-detection block, and
+  the honest response was to not attempt to defeat it (no headless
+  browser, no fingerprint evasion) — it's still registered so the
+  admin UI can show "DramaBox: known but unavailable" instead of
+  silently omitting it.
+- `lib/discovery/webExtract.ts` — fetches a page and reads its own
+  `og:`/`twitter:` meta tags, the same mechanism `fetchTitleMetadata.ts`
+  uses for the single-URL admin form. No AI, no JS execution.
+
+**The correction**: `reelshort.ts` and `shortmax.ts` originally
+implemented `discover()` by fetching each platform's own shelf/listing
+page (`reelshort.com/shelf/...`, ShortMax's homepage) and
+regex-extracting every episode/drama link on it — automated
+enumeration of a platform's catalog, not a human choosing individual
+links. That's scraping regardless of how politely it's implemented
+(no bot-detection bypass, reasonable timeouts, draft-only import —
+all genuinely careful engineering), and it almost certainly runs
+against both platforms' Terms of Service, which is close to universal
+boilerplate against automated crawling on consumer platforms. It's
+also a direct, asymmetric risk to the actual product: ReelShort and
+ShortMax are literally the platforms Kilig's "watch on" deep-linking
+depends on — getting noticed and blocked by either would damage the
+one relationship the whole product needs. This also reverses the
+project's founding decision, made before any code existed: the
+original design doc explicitly considered and rejected
+"scraping/aggregating public listings" as the MVP content strategy,
+for exactly this reason.
+
+Both plugins now only support mission `"manualUrls"` — the admin
+pastes a list of links they specifically found and chose (via
+verticaldrama.tv's public rankings, or a platform's own trending
+page, read by a human) into `DiscoveryMissionRunner.tsx`'s textarea.
+The shelf-fetching code and `webExtract.ts`'s `extractLinks()` helper
+(the actual scraping primitive) were removed entirely, not disabled
+behind a flag — nothing left reachable to accidentally turn back on.
+`importTitle()` — fetching one page a human chose — was never the
+concern and is unchanged.
+
+If either platform ever offers an official data partnership or API,
+that's what these plugins should be rewritten against — same
+distinction the DramaBox stub already draws.
