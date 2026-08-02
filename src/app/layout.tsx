@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Oswald, Inter, JetBrains_Mono } from "next/font/google";
+import { IntroSplash } from "@/components/IntroSplash";
 import "./globals.css";
 
 // Display: condensed bold sans, film-poster register — reserved for
@@ -30,9 +31,9 @@ export const metadata: Metadata = {
     default: "Kilig — find your next obsession",
     // Child routes (e.g. title/[id]'s generateMetadata) set title to
     // just the title name; Next.js composes it against this template
-    // automatically, so "The Light Between Oceans" becomes
-    // "The Light Between Oceans · Kilig" without repeating the suffix
-    // in every generateMetadata call.
+    // automatically, so a title named "Second Chance" becomes
+    // "Second Chance · Kilig" without repeating the suffix in every
+    // generateMetadata call.
     template: "%s · Kilig",
   },
   description: SITE_DESCRIPTION,
@@ -55,7 +56,10 @@ export default function RootLayout({
       lang="en"
       className={`${oswald.variable} ${inter.variable} ${jetbrainsMono.variable} h-full overflow-x-hidden antialiased`}
     >
-      <body className="min-h-full overflow-x-hidden">{children}</body>
+      <body className="min-h-full overflow-x-hidden">
+        <IntroSplash />
+        {children}
+      </body>
     </html>
   );
 }

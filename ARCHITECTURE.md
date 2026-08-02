@@ -533,3 +533,40 @@ concern and is unchanged.
 If either platform ever offers an official data partnership or API,
 that's what these plugins should be rewritten against — same
 distinction the DramaBox stub already draws.
+
+## Mock titles removed from prisma/seed.ts
+
+The 6 fictional example titles (The Light Between Oceans, Portrait of
+a Lady on Fire, His Secret Baby, Revenge After Betrayal, The CEO's
+Contract Wife, Surrender to Love) are gone from the seed script —
+real titles now go in via `/admin/titles/new` or the Discovery
+Engine. `TAG_DEFINITIONS` stayed: that's a real, useful starting
+taxonomy, not mock content, and new tags beyond it auto-register as
+admins tag real titles anyway (see `normalizeAndRegisterTags()` in
+`lib/actions.ts`). Re-running `npm run db:seed` against a database
+that already has the old mock rows in it won't remove them — this
+only changes what a *fresh* seed creates. Existing mock rows need
+deleting directly, either through `/admin`'s per-title delete or a
+one-time SQL cleanup.
+
+## Intro splash (`IntroSplash.tsx`)
+
+A ~2.5s black-background opening transition, mounted once in the root
+layout so it covers any entry point, not just `/`. The word "Kilig"
+uses the exact same classes as the existing homepage eyebrow label
+(`font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]`)
+— no new styling invented, per an explicit "no design changes"
+instruction. Shows once per browser session (`sessionStorage`), not
+on every internal navigation.
+
+Worth understanding why this one Client Component looks more
+elaborate than most others in the app: `useState(true)` as the
+initial value (not `false`) is deliberate, not a bug — it makes the
+server-rendered HTML and the client's first hydration pass agree
+("splash visible"), avoiding both a hydration-mismatch warning and a
+flash of the real homepage before the splash appears. Suppressing it
+for a repeat view within the same session happens in
+`useLayoutEffect` rather than `useEffect`, specifically because
+`useLayoutEffect` runs before the browser paints — so a returning
+visitor never sees the splash flash on and immediately off, they just
+never see it at all.
