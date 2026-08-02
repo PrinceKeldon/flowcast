@@ -35,7 +35,7 @@ function isBlockedHost(hostname: string): boolean {
   return false;
 }
 
-function decodeEntities(text: string): string {
+export function decodeEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -72,12 +72,13 @@ function resolveUrl(rawUrl: string, base: URL): string | null {
 }
 
 /**
- * Fetches raw HTML for a URL. Bounded by MAX_BYTES / FETCH_TIMEOUT_MS
- * so a single slow or huge page can't stall a whole mission. Returns
- * null (never throws) on any failure — callers decide how to record
- * that against the mission item.
+ * Core bounded fetch: SSRF guard, timeout, byte cap, User-Agent — the
+ * protections every fetch in this engine should have, regardless of
+ * what content type it's expecting back. fetchHtml and fetchXml are
+ * both thin wrappers around this with a different acceptContentType
+ * predicate. Returns null (never throws) on any failure.
  */
-export async function fetchHtml(rawUrl: string): Promise<string | null> {
+async function fetchBounded(rawUrl: string, acceptContentType: (contentType: string) => boolean): Promise<string | null> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -99,9 +100,9 @@ export async function fetchHtml(rawUrl: string): Promise<string | null> {
     if (!res.ok) return null;
 
     const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html")) return null;
+    if (!acceptContentType(contentType)) return null;
 
-    let html = "";
+    let body = "";
     const reader = res.body?.getReader();
     if (reader) {
       const decoder = new TextDecoder();
@@ -109,19 +110,42 @@ export async function fetchHtml(rawUrl: string): Promise<string | null> {
       while (bytesRead < MAX_BYTES) {
         const { done, value } = await reader.read();
         if (done) break;
-        html += decoder.decode(value, { stream: true });
+        body += decoder.decode(value, { stream: true });
         bytesRead += value.length;
       }
       await reader.cancel().catch(() => {});
     } else {
-      html = await res.text();
+      body = await res.text();
     }
-    return html;
+    return body;
   } catch {
     return null;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Fetches raw HTML for a URL. Bounded by MAX_BYTES / FETCH_TIMEOUT_MS
+ * so a single slow or huge page can't stall a whole mission. Returns
+ * null (never throws) on any failure — callers decide how to record
+ * that against the mission item.
+ */
+export async function fetchHtml(rawUrl: string): Promise<string | null> {
+  return fetchBounded(rawUrl, (ct) => ct.includes("text/html"));
+}
+
+/**
+ * Fetches raw RSS/Atom XML for a URL, same protections as fetchHtml.
+ * Used by trendScout.ts — kept here rather than duplicated, since
+ * "safely fetch a bounded remote document" is exactly this module's
+ * job regardless of the expected content type.
+ */
+export async function fetchXml(rawUrl: string): Promise<string | null> {
+  return fetchBounded(
+    rawUrl,
+    (ct) => ct.includes("xml") || ct.includes("rss") || ct.includes("atom")
+  );
 }
 
 /** Pulls og:/twitter: meta tags out of already-fetched HTML. Pure — no network. */
