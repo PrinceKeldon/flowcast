@@ -1,0 +1,14 @@
+-- AlterEnum
+-- Skip Meter Stage 2: adds 'hook_vote' to InteractionAction for the
+-- community "when did it hook you?" vote (logHookVote() in
+-- lib/actions.ts).
+--
+-- Same isolation reasoning as the earlier 'reacted' migration
+-- (20260802120000_add_reacted_interaction_action) — this file
+-- contains ONLY this one statement because PostgreSQL won't let a
+-- newly-added enum value be used within the same transaction that
+-- added it. The partial unique index that filters on
+-- action = 'hook_vote' lives in the next migration
+-- (20260803120200_add_hook_vote_uniqueness_index) for exactly that
+-- reason.
+ALTER TYPE "InteractionAction" ADD VALUE 'hook_vote';

@@ -3,13 +3,21 @@
 import { requireAdmin } from "@/lib/admin";
 
 const FETCH_TIMEOUT_MS = 8000;
-const MAX_BYTES = 200_000; // meta tags live in <head>, never need the whole page
+const MAX_BYTES = 400_000; // was head-only (200KB); episode-count extraction needs body text too now
 
 export interface TitleMetadataResult {
   name: string | null;
   synopsis: string | null;
   coverImageUrl: string | null;
   platformGuess: string | null;
+  episodeCount: number | null;
+  /**
+   * How episodeCount was found, so the admin form can show honest
+   * confidence rather than presenting a text-pattern guess with the
+   * same weight as a structured-data hit. null when episodeCount is
+   * also null.
+   */
+  episodeCountSource: "structured" | "text-pattern" | null;
   error?: string;
 }
 
@@ -68,6 +76,62 @@ function resolveImageUrl(rawUrl: string, baseUrl: URL): string | null {
 }
 
 /**
+ * Structured-data episode count — schema.org's numberOfEpisodes on a
+ * TVSeries/CreativeWorkSeries JSON-LD block, when a platform bothers
+ * to include one. Genuinely reliable when present, unlike the text
+ * fallback below, because it's the platform explicitly stating a
+ * count in machine-readable form rather than us guessing at prose.
+ */
+function extractEpisodeCountFromJsonLd(html: string): number | null {
+  const blocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+
+  for (const block of blocks) {
+    const jsonMatch = block.match(/>([\s\S]*?)<\/script>/i);
+    if (!jsonMatch?.[1]) continue;
+
+    try {
+      const parsed = JSON.parse(jsonMatch[1].trim());
+      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+      for (const entry of candidates) {
+        const count = entry?.numberOfEpisodes;
+        if (typeof count === "number" && count > 0) return Math.round(count);
+        if (typeof count === "string" && /^\d+$/.test(count)) return parseInt(count, 10);
+      }
+    } catch {
+      // Malformed JSON-LD is common enough on real sites not to treat
+      // as a fetch failure — just skip this block and keep looking.
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Best-effort text-pattern fallback for when there's no structured
+ * data: looks for phrasing like "24 Episodes" / "Total: 24 episodes"
+ * in the page's visible text. Genuinely a guess, not a guarantee —
+ * there's no standard for this the way there is for og:title, so this
+ * is pattern-matching prose, not reading a declared fact. Callers
+ * must treat this as a lower-confidence result than the JSON-LD path
+ * (see episodeCountSource on TitleMetadataResult).
+ */
+function extractEpisodeCountFromText(html: string): number | null {
+  const plainText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+
+  const match = plainText.match(/\b(\d{1,4})\s*(?:total\s+)?episodes?\b/i);
+  if (!match) return null;
+
+  const count = parseInt(match[1], 10);
+  // Sanity bound — a match like "2024 episodes" (a year, misfired) or
+  // "0 episodes" isn't a real episode count.
+  if (count < 1 || count > 2000) return null;
+  return count;
+}
+
+/**
  * Fetches a page and pulls whatever a well-built page's own meta tags
  * offer — the same mechanism link-preview bots (Slack, Twitter,
  * iMessage) use to build a card, not an LLM. Deliberately not
@@ -77,11 +141,28 @@ function resolveImageUrl(rawUrl: string, baseUrl: URL): string | null {
  * editorial judgment. Treat every field this returns as a first draft
  * to review, not a final answer. See admin/titles/new for how the
  * result gets used: it prefills the form, nothing auto-submits.
+ *
+ * episodeCount is a step down in reliability from the rest: there's
+ * no standard meta tag for it the way there is for og:title, so this
+ * tries schema.org JSON-LD (numberOfEpisodes) first — genuinely
+ * reliable when a platform includes it — and falls back to matching
+ * phrasing like "24 Episodes" in the page's visible text, which is a
+ * real best-effort guess, not a guarantee. episodeCountSource tells
+ * the caller which path produced it, so the admin form can show
+ * honest confidence instead of presenting a text-pattern guess with
+ * the same weight as a structured-data hit.
  */
 export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataResult> {
   await requireAdmin();
 
-  const empty: TitleMetadataResult = { name: null, synopsis: null, coverImageUrl: null, platformGuess: null };
+  const empty: TitleMetadataResult = {
+    name: null,
+    synopsis: null,
+    coverImageUrl: null,
+    platformGuess: null,
+    episodeCount: null,
+    episodeCountSource: null,
+  };
 
   let url: URL;
   try {
@@ -127,12 +208,12 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
         if (done) break;
         html += decoder.decode(value, { stream: true });
         bytesRead += value.length;
-        if (html.includes("</head>")) break;
       }
       await reader.cancel().catch(() => {});
     } else {
       html = await res.text();
     }
+
 
     const ogTitle = extractMetaContent(html, "og:title");
     const plainTitle = extractPlainTitle(html);
@@ -154,7 +235,13 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
       extractMetaContent(html, "twitter:image") ?? extractMetaContent(html, "twitter:image:src");
     const coverImageUrl = rawImage ? resolveImageUrl(rawImage, url) : null;
 
-    if (!name && !synopsis && !coverImageUrl) {
+    const structuredEpisodeCount = extractEpisodeCountFromJsonLd(html);
+    const textEpisodeCount = structuredEpisodeCount === null ? extractEpisodeCountFromText(html) : null;
+    const episodeCount = structuredEpisodeCount ?? textEpisodeCount;
+    const episodeCountSource: TitleMetadataResult["episodeCountSource"] =
+      structuredEpisodeCount !== null ? "structured" : textEpisodeCount !== null ? "text-pattern" : null;
+
+    if (!name && !synopsis && !coverImageUrl && episodeCount === null) {
       return { ...empty, error: "No usable metadata found on that page." };
     }
 
@@ -163,6 +250,8 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
       synopsis: synopsis || null,
       coverImageUrl,
       platformGuess: siteName,
+      episodeCount,
+      episodeCountSource,
     };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {

@@ -42,21 +42,26 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
           defaultName={title.name}
           defaultSynopsis={title.synopsis ?? ""}
           defaultCoverImageUrl={title.coverImageUrl ?? ""}
+          defaultEpisodeCount={title.episodeCount ?? ""}
         />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass} htmlFor="language">Language (ISO code) *</label>
+            <label className={labelClass} htmlFor="language">Viewing language (ISO code) *</label>
             <input id="language" name="language" required defaultValue={title.language} className={inputClass} />
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              What a viewer can actually watch this in on Kilig — not original production language.
+            </p>
           </div>
           <div>
-            <label className={labelClass} htmlFor="countryOfOrigin">Country of origin</label>
+            <label className={labelClass} htmlFor="countryOfOrigin">Country of origin (optional)</label>
             <input
               id="countryOfOrigin"
               name="countryOfOrigin"
               defaultValue={title.countryOfOrigin ?? ""}
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Not shown publicly yet — skip if unsure.</p>
           </div>
         </div>
 
@@ -87,26 +92,47 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
           <input id="castType" name="castType" defaultValue={title.castType ?? ""} placeholder="unknown_cast" className={inputClass} />
         </div>
 
+        <div>
+          <label className={labelClass} htmlFor="pacing">Pacing</label>
+          <select id="pacing" name="pacing" defaultValue={title.pacing ?? ""} className={inputClass}>
+            <option value="">—</option>
+            <option value="fast">Fast</option>
+            <option value="medium">Medium</option>
+            <option value="slow">Slow</option>
+          </select>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass} htmlFor="pacing">Pacing</label>
-            <select id="pacing" name="pacing" defaultValue={title.pacing ?? ""} className={inputClass}>
+            <label className={labelClass} htmlFor="editorialHookPoint">Skip Meter — hook point</label>
+            <select
+              id="editorialHookPoint"
+              name="editorialHookPoint"
+              defaultValue={title.editorialHookPoint ?? ""}
+              className={inputClass}
+            >
               <option value="">—</option>
-              <option value="fast">Fast</option>
-              <option value="medium">Medium</option>
-              <option value="slow">Slow</option>
+              <option value="hooks_fast">Hooks fast</option>
+              <option value="slow_burn">Slow burn, worth it</option>
+              <option value="filler_heavy">Filler-heavy</option>
             </select>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Judgeable from the first episode or two.</p>
           </div>
           <div>
-            <label className={labelClass} htmlFor="episodeCount">Episode count</label>
-            <input
-              id="episodeCount"
-              name="episodeCount"
-              type="number"
-              min={0}
-              defaultValue={title.episodeCount ?? undefined}
+            <label className={labelClass} htmlFor="editorialEndingType">Skip Meter — ending (optional)</label>
+            <select
+              id="editorialEndingType"
+              name="editorialEndingType"
+              defaultValue={title.editorialEndingType ?? ""}
               className={inputClass}
-            />
+            >
+              <option value="">— haven&apos;t finished it —</option>
+              <option value="happy">Happy</option>
+              <option value="bittersweet">Bittersweet</option>
+              <option value="cliffhanger">Cliffhanger</option>
+              <option value="unresolved">Unresolved</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Only fill in once you&apos;ve actually finished it.</p>
           </div>
         </div>
 
