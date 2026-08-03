@@ -27,3 +27,20 @@ export async function getSessionId(): Promise<string> {
   });
   return id;
 }
+
+/**
+ * Read-only session lookup — returns the existing session id if the
+ * cookie is already set, or null if this visitor has none yet. Unlike
+ * getSessionId(), this never writes a cookie, so it's safe to call
+ * from a Server Component's render body (only cookie *mutation* is
+ * restricted to Server Actions/Route Handlers — reading is always
+ * fine). Used where a page needs to check "has this session already
+ * done X" without creating a session as a side effect of looking —
+ * e.g. title/[id]/page.tsx checking whether the current visitor has
+ * already reacted, to pre-disable ReactionTap on load instead of only
+ * discovering that after a rejected tap.
+ */
+export async function peekSessionId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(SESSION_COOKIE)?.value ?? null;
+}

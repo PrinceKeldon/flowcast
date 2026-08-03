@@ -1,0 +1,15 @@
+-- AlterEnum
+-- Adds 'reacted' to InteractionAction for the reaction-tap feature
+-- (ReactionTap.tsx / logReaction() in lib/actions.ts).
+--
+-- This migration deliberately contains ONLY this one statement.
+-- PostgreSQL will not let a new enum value be *used* (e.g. in a WHERE
+-- clause, an INSERT, or an index predicate) within the same
+-- transaction that ADD VALUE ran in — the new value has to actually
+-- commit first. The follow-up partial unique index that filters on
+-- action = 'reacted' lives in the next migration
+-- (20260802120100_add_reaction_uniqueness_index) for exactly that
+-- reason; combining the two into one file would fail deployment with
+-- "unsafe use of new value of enum type" the first time it ran
+-- against a real database.
+ALTER TYPE "InteractionAction" ADD VALUE 'reacted';

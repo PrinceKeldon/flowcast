@@ -4,10 +4,12 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { peekSessionId } from "@/lib/session";
 import { getSimilarTitles, computeTagAlignment } from "@/lib/matching";
 import { isAdminSession } from "@/lib/admin";
 import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
+import { ReactionTap } from "@/components/ReactionTap";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { TaxonomySignal } from "@/components/TaxonomySignal";
 import { TitleCoverArt } from "@/components/TitleCoverArt";
@@ -80,6 +82,19 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
   const tropeAlignment = computeTagAlignment(title.tropeTags, similar, "tropeTags");
   const moodAlignment = computeTagAlignment(title.moodTags, similar, "moodTags");
 
+  // Read-only — peekSessionId() never writes a cookie, so this is safe
+  // during render (see lib/session.ts docstring). A visitor with no
+  // session yet obviously hasn't reacted, so this short-circuits to
+  // null without a query in that case.
+  const existingSessionId = await peekSessionId();
+  const priorReaction = existingSessionId
+    ? await prisma.userInteraction.findFirst({
+        where: { sessionId: existingSessionId, titleId: title.id, action: "reacted" },
+        select: { metadata: true },
+      })
+    : null;
+  const initialReactedEmoji = (priorReaction?.metadata as { emoji?: string } | undefined)?.emoji ?? null;
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-14 pb-20">
       <ViewLogger titleId={title.id} />
@@ -119,6 +134,8 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
 
           {/* Editorial reactions before raw taxonomy — see ARCHITECTURE.md */}
           <ReactionsList reactions={title.reactions} />
+
+          <ReactionTap titleId={title.id} initialReactedEmoji={initialReactedEmoji} />
 
           <InsightsPanel tropeTags={title.tropeTags} moodTags={title.moodTags} pacing={title.pacing} />
 

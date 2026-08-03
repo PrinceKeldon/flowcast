@@ -43,6 +43,7 @@ enum InteractionAction {
   clicked_out
   saved
   searched
+  reacted
 }
 
 // The taxonomy asset. Rows are seeded up front (see prisma/seed.ts)
@@ -165,6 +166,17 @@ model TitleReaction {
 
 // Seed of the recommendation flywheel — log every view/click/save/search
 // even before anything reads this table. Cheap now, invaluable later.
+//
+// One-reaction-per-session enforcement: `reacted` rows are additionally
+// constrained by a *partial* unique index — one (session_id, title_id)
+// pair per session, scoped to `WHERE action = 'reacted'` — added by hand
+// in prisma/migrations/20260802120100_add_reaction_uniqueness_index/.
+// Prisma's schema language has no way to express a WHERE-scoped unique
+// index (only whole-table @@unique, which would wrongly forbid a
+// session from having multiple viewed_detail/clicked_out rows for the
+// same title), so this constraint exists in the database only — it's
+// not visible here. logReaction() in actions.ts catches Prisma's P2002
+// violation code to turn that into an honest "already reacted" result.
 model UserInteraction {
   id              String             @id @default(uuid())
   userId          String?            @map("user_id")
