@@ -25,12 +25,26 @@ export function IntroSplash() {
     // reintroducing the hydration mismatch this effect-based approach
     // exists to avoid (the server has no sessionStorage to agree with
     // the client on an initial value).
-    if (sessionStorage.getItem(SESSION_KEY)) {
+    //
+    // sessionStorage can throw in private browsing and some in-app
+    // mobile browsers; if it does we must still dismiss the overlay,
+    // or it would cover the page forever.
+    let alreadyShown = false;
+    try {
+      alreadyShown = !!sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      alreadyShown = true;
+    }
+    if (alreadyShown) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate, see comment above
       setVisible(false);
       return;
     }
-    sessionStorage.setItem(SESSION_KEY, "1");
+    try {
+      sessionStorage.setItem(SESSION_KEY, "1");
+    } catch {
+      // Storage unavailable — show the splash once this load only.
+    }
 
     const frame = requestAnimationFrame(() => setTextVisible(true));
     const fadeOutTimer = setTimeout(() => setFadingOut(true), TOTAL_DURATION_MS - OVERLAY_FADE_OUT_MS);
@@ -47,7 +61,7 @@ export function IntroSplash() {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)] transition-opacity duration-[600ms] ease-out ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)] transition-opacity duration-[600ms] ease-out [animation:kilig-intro-dismiss_2500ms_ease-out_forwards] ${
         fadingOut ? "opacity-0" : "opacity-100"
       }`}
       aria-hidden="true"

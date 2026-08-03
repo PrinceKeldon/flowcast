@@ -28,3 +28,25 @@ body {
   color: var(--text);
   font-family: var(--font-body), sans-serif;
 }
+
+/* IntroSplash safety net: the splash is intentionally server-rendered
+   visible (no flash of the homepage), but it must never trap the page.
+   If client JS is slow, blocked, or hydration fails on a mobile
+   browser, this animation still fades the overlay away after the same
+   duration the JS would have used — 2.5s, fading the last 600ms.
+   When JS *is* running it removes the element from the DOM first, so
+   the animation only ever matters for the no-JS/hydration-failure
+   path. */
+@keyframes kilig-intro-dismiss {
+  0% {
+    opacity: 1;
+  }
+  76% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
