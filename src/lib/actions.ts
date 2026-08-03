@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { requireAdmin } from "@/lib/admin";
-import type { InteractionAction, Prisma, TagCategory } from "@/generated/prisma/client";
+import { Prisma, type InteractionAction, type TagCategory } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -32,6 +32,64 @@ export async function logInteraction(input: {
     console.error("Failed to log interaction", err);
     // Intentionally swallowed — see docstring.
   }
+}
+
+/**
+ * Records an anonymous single-tap reaction, enforced to one per
+ * session per title by a partial unique index in the database (see
+ * schema.prisma's comment on UserInteraction and
+ * prisma/migrations/20260802120100_add_reaction_uniqueness_index) —
+ * NOT by this function checking first, which would be a race between
+ * two tabs/taps rather than an actual guarantee.
+ *
+ * Unlike logInteraction() (fire-and-forget, always swallows errors),
+ * this one has to report back: ReactionTap.tsx needs to know whether
+ * the tap landed or whether this session already reacted, to show
+ * honest UI instead of a generic failure. P2002 (unique constraint
+ * violation) is the *expected* shape of "already reacted" — everything
+ * else is a genuine unexpected failure, logged and reported as such.
+ */
+export async function logReaction(
+  titleId: string,
+  emoji: string
+): Promise<{ ok: true } | { ok: false; alreadyReacted: boolean }> {
+  try {
+    const sessionId = await getSessionId();
+    await prisma.userInteraction.create({
+      data: {
+        sessionId,
+        titleId,
+        action: "reacted",
+        metadata: { emoji },
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { ok: false, alreadyReacted: true };
+    }
+    console.error("Failed to log reaction", err);
+    return { ok: false, alreadyReacted: false };
+  }
+}
+
+/**
+ * Looks up which emoji (if any) this session already reacted with on
+ * a title. Used by ReactionTap.tsx only for the rare race case where
+ * logReaction() comes back `alreadyReacted` for a tap that isn't the
+ * one that actually landed (e.g. two tabs open) — rather than
+ * assuming the just-tapped emoji was the one that won, which would
+ * misrepresent the actual stored reaction.
+ */
+export async function getReactedEmoji(titleId: string): Promise<string | null> {
+  const sessionId = await getSessionId();
+  const existing = await prisma.userInteraction.findFirst({
+    where: { sessionId, titleId, action: "reacted" },
+    select: { metadata: true },
+  });
+  if (!existing) return null;
+  const metadata = existing.metadata as { emoji?: string };
+  return metadata.emoji ?? null;
 }
 
 /**

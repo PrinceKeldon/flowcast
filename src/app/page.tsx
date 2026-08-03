@@ -33,6 +33,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </Suspense>
 
       <Suspense fallback={<p className="text-[var(--text-muted)]">Loading...</p>}>
+        <FandomTrendingRail />
+      </Suspense>
+
+      <Suspense fallback={<p className="text-[var(--text-muted)]">Loading...</p>}>
         <NewestRail />
       </Suspense>
 
@@ -86,6 +90,46 @@ async function TrendingRail() {
     .filter((t): t is (typeof titles)[number] => t != null);
 
   return <TitleRail eyebrow="Trending right now" titles={ordered} />;
+}
+
+async function FandomTrendingRail() {
+  // Deliberately a *separate* signal from TrendingRail above, not a
+  // blend of the two — that rail measures view/click behavior
+  // (clicked_out), this one measures reaction volume (reacted). They
+  // answer different questions ("what are people actually watching"
+  // vs. "what's getting an emotional reaction right now") and merging
+  // them would quietly overwrite one honest signal with another. See
+  // ARCHITECTURE.md's "Trending must be real or absent" principle —
+  // same reasoning applies here: empty result renders nothing rather
+  // than falling back to some other list to fill the section.
+  //
+  // 48h window, not 7 days like TrendingRail: reactions are a lower-
+  // volume signal than clicks (one tap vs. every click-through), and
+  // the whole point of "in the Fandom" is current buzz, not a title
+  // that quietly accumulated reactions over a week. 48h gave enough
+  // room for a slow news day without just re-showing TrendingRail's
+  // week-old winners under a different label.
+  const since = new Date();
+  since.setHours(since.getHours() - 48);
+
+  const grouped = await prisma.userInteraction.groupBy({
+    by: ["titleId"],
+    where: { action: "reacted", createdAt: { gte: since } },
+    _count: { id: true },
+    orderBy: { _count: { id: "desc" } },
+    take: 10,
+  });
+
+  if (grouped.length === 0) return null;
+
+  const titles = await prisma.title.findMany({
+    where: { id: { in: grouped.map((g: { titleId: string }) => g.titleId) }, isPublished: true },
+  });
+  const ordered = grouped
+    .map((g: { titleId: string }) => titles.find((t: { id: string }) => t.id === g.titleId))
+    .filter((t): t is (typeof titles)[number] => t != null);
+
+  return <TitleRail eyebrow="Trending in the Fandom · reactions, last 48h" titles={ordered} />;
 }
 
 async function MoodRail({ chip }: { chip: (typeof MOOD_CHIPS)[number] }) {
