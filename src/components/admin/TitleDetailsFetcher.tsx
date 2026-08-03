@@ -11,17 +11,21 @@ interface TitleDetailsFetcherProps {
   defaultName?: string;
   defaultSynopsis?: string;
   defaultCoverImageUrl?: string;
+  defaultEpisodeCount?: number | string;
 }
 
 export function TitleDetailsFetcher({
   defaultName = "",
   defaultSynopsis = "",
   defaultCoverImageUrl = "",
+  defaultEpisodeCount = "",
 }: TitleDetailsFetcherProps) {
   const [referenceUrl, setReferenceUrl] = useState("");
   const [name, setName] = useState(defaultName);
   const [synopsis, setSynopsis] = useState(defaultSynopsis);
   const [coverImageUrl, setCoverImageUrl] = useState(defaultCoverImageUrl);
+  const [episodeCount, setEpisodeCount] = useState<number | string>(defaultEpisodeCount);
+  const [episodeCountSource, setEpisodeCountSource] = useState<"structured" | "text-pattern" | null>(null);
   const [platformGuess, setPlatformGuess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -35,7 +39,7 @@ export function TitleDetailsFetcher({
     }
     startTransition(async () => {
       const result = await fetchTitleMetadata(referenceUrl.trim());
-      if (result.error && !result.name && !result.synopsis && !result.coverImageUrl) {
+      if (result.error && !result.name && !result.synopsis && !result.coverImageUrl && result.episodeCount === null) {
         setError(result.error);
         return;
       }
@@ -43,6 +47,10 @@ export function TitleDetailsFetcher({
       if (result.synopsis) setSynopsis(result.synopsis);
       if (result.coverImageUrl) setCoverImageUrl(result.coverImageUrl);
       if (result.platformGuess) setPlatformGuess(result.platformGuess);
+      if (result.episodeCount !== null) {
+        setEpisodeCount(result.episodeCount);
+        setEpisodeCountSource(result.episodeCountSource);
+      }
     });
   }
 
@@ -126,6 +134,30 @@ export function TitleDetailsFetcher({
             </div>
           )}
         </div>
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="episodeCount">Episode count</label>
+        <input
+          id="episodeCount"
+          name="episodeCount"
+          type="number"
+          min={0}
+          value={episodeCount}
+          onChange={(e) => {
+            setEpisodeCount(e.target.value);
+            setEpisodeCountSource(null); // manually edited — no longer attributable to the fetch
+          }}
+          className={inputClass}
+        />
+        {episodeCountSource === "structured" && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">From the page&apos;s own structured data — reliable.</p>
+        )}
+        {episodeCountSource === "text-pattern" && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Guessed from page text (no structured data found) — worth double-checking.
+          </p>
+        )}
       </div>
     </div>
   );

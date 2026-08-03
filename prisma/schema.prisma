@@ -37,6 +37,25 @@ enum PriceModel {
   ad_supported
 }
 
+// Skip Meter Stage 1 — the curator's own honest read, not a fake
+// aggregate. hooks_fast/slow_burn/filler_heavy is deliberately
+// judgeable from watching just the first episode or two, since that's
+// realistically all the curator can commit to per title (see
+// ARCHITECTURE.md's Skip Meter section for why this is the primary
+// field and EndingType is optional).
+enum HookPoint {
+  hooks_fast
+  slow_burn
+  filler_heavy
+}
+
+enum EndingType {
+  happy
+  bittersweet
+  cliffhanger
+  unresolved
+}
+
 enum InteractionAction {
   viewed_listing
   viewed_detail
@@ -44,6 +63,7 @@ enum InteractionAction {
   saved
   searched
   reacted
+  hook_vote
 }
 
 // The taxonomy asset. Rows are seeded up front (see prisma/seed.ts)
@@ -97,6 +117,17 @@ model Title {
   moodTags          String[]    @map("mood_tags")
   pacing            Pacing?
   castType          String?     @map("cast_type")
+
+  // Skip Meter Stage 1 (editorial) — the curator's own honest read,
+  // realistically formed from watching 1-2 episodes, not a full
+  // watch-through. editorialEndingType is intentionally never
+  // required or guessed — see ARCHITECTURE.md — only filled in once
+  // the curator has actually finished a title. Stage 2 (community
+  // voting on when a viewer got hooked, aggregated behind a real
+  // sample-size threshold) lives on UserInteraction's new `hook_vote`
+  // action, not here — this is only ever one person's read.
+  editorialHookPoint  HookPoint?  @map("editorial_hook_point")
+  editorialEndingType EndingType? @map("editorial_ending_type")
 
   episodeCount        Int?       @map("episode_count")
   avgEpisodeSeconds   Int?       @map("avg_episode_seconds")
@@ -177,6 +208,12 @@ model TitleReaction {
 // same title), so this constraint exists in the database only — it's
 // not visible here. logReaction() in actions.ts catches Prisma's P2002
 // violation code to turn that into an honest "already reacted" result.
+//
+// Same pattern for `hook_vote` (Skip Meter Stage 2 — "when did it hook
+// you?"): a second partial unique index, one (session_id, title_id)
+// pair scoped to WHERE action = 'hook_vote', added in
+// prisma/migrations/20260803120200_add_hook_vote_uniqueness_index/.
+// logHookVote() in actions.ts catches P2002 the same way.
 model UserInteraction {
   id              String             @id @default(uuid())
   userId          String?            @map("user_id")

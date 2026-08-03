@@ -151,7 +151,7 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
                         </div>
                         <div>
                           <label className={labelClass} htmlFor={`regionAvailability-${a.id}`}>
-                            Regions (comma-separated)
+                            Regions (comma-separated, optional)
                           </label>
                           <input
                             id={`regionAvailability-${a.id}`}
@@ -160,6 +160,7 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
                             placeholder="US, DE, KE"
                             className={inputClass}
                           />
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">Not shown publicly yet — skip if unsure.</p>
                         </div>
                         <button
                           type="submit"
@@ -216,8 +217,9 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
               </div>
             </div>
             <div>
-              <label className={labelClass} htmlFor="regionAvailability">Regions (comma-separated)</label>
+              <label className={labelClass} htmlFor="regionAvailability">Regions (comma-separated, optional)</label>
               <input id="regionAvailability" name="regionAvailability" placeholder="US, DE, KE" className={inputClass} />
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Not shown publicly yet — skip if unsure.</p>
             </div>
             <button
               type="submit"

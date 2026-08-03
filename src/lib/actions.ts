@@ -92,6 +92,94 @@ export async function getReactedEmoji(titleId: string): Promise<string | null> {
   return metadata.emoji ?? null;
 }
 
+// Skip Meter Stage 2 — "when did it hook you?" community vote. Same
+// anonymous, one-per-session-per-title shape as the reaction tap
+// above (partial unique index — see schema.prisma), on the same
+// UserInteraction table via the `hook_vote` action, distinguishing
+// which bucket via `metadata: { hookedAt }`.
+export const HOOK_VOTE_BUCKETS = ["ep1", "ep3", "ep9", "never"] as const;
+export type HookVoteBucket = (typeof HOOK_VOTE_BUCKETS)[number];
+
+// Mirrors MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL in matching.ts — same
+// reasoning: a handful of votes isn't a real signal, it's noise
+// wearing a percentage sign. Below this, getHookVoteSummary() returns
+// null and the aggregate simply doesn't render — voting still works
+// and still counts, it just doesn't get shown as a stat yet. See
+// ARCHITECTURE.md's Skip Meter section for why this is non-negotiable.
+const MIN_VOTES_FOR_SKIP_METER_DISPLAY = 5;
+
+/** Records an anonymous hook-vote. Same shape/reasoning as logReaction() above. */
+export async function logHookVote(
+  titleId: string,
+  hookedAt: HookVoteBucket
+): Promise<{ ok: true } | { ok: false; alreadyVoted: boolean }> {
+  try {
+    const sessionId = await getSessionId();
+    await prisma.userInteraction.create({
+      data: {
+        sessionId,
+        titleId,
+        action: "hook_vote",
+        metadata: { hookedAt },
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { ok: false, alreadyVoted: true };
+    }
+    console.error("Failed to log hook vote", err);
+    return { ok: false, alreadyVoted: false };
+  }
+}
+
+/** Race-condition fallback for SkipMeter.tsx — same reasoning as getReactedEmoji(). */
+export async function getMyHookVote(titleId: string): Promise<HookVoteBucket | null> {
+  const sessionId = await getSessionId();
+  const existing = await prisma.userInteraction.findFirst({
+    where: { sessionId, titleId, action: "hook_vote" },
+    select: { metadata: true },
+  });
+  if (!existing) return null;
+  const metadata = existing.metadata as { hookedAt?: string };
+  return HOOK_VOTE_BUCKETS.includes(metadata.hookedAt as HookVoteBucket)
+    ? (metadata.hookedAt as HookVoteBucket)
+    : null;
+}
+
+/**
+ * Tallies hook-votes for a title, gated by MIN_VOTES_FOR_SKIP_METER_DISPLAY
+ * (see above) — returns null below threshold, never a stat built on a
+ * handful of taps. Aggregates in application code rather than a
+ * database GROUP BY: `hookedAt` lives inside the `metadata` JSON
+ * column, which Prisma's typed groupBy can't group by directly, and
+ * per-title vote volume is small enough at this project's scale that
+ * fetching every row and tallying in JS is simpler and safer than
+ * reaching for raw SQL — same call duplicate.ts already made for
+ * title-similarity comparison. Revisit if a single title's vote count
+ * ever gets large enough for that fetch to matter.
+ */
+export async function getHookVoteSummary(
+  titleId: string
+): Promise<{ counts: Record<HookVoteBucket, number>; total: number } | null> {
+  const rows = await prisma.userInteraction.findMany({
+    where: { titleId, action: "hook_vote" },
+    select: { metadata: true },
+  });
+
+  const counts: Record<HookVoteBucket, number> = { ep1: 0, ep3: 0, ep9: 0, never: 0 };
+  for (const row of rows) {
+    const hookedAt = (row.metadata as { hookedAt?: string } | null)?.hookedAt;
+    if (hookedAt && HOOK_VOTE_BUCKETS.includes(hookedAt as HookVoteBucket)) {
+      counts[hookedAt as HookVoteBucket]++;
+    }
+  }
+
+  const total = rows.length;
+  if (total < MIN_VOTES_FOR_SKIP_METER_DISPLAY) return null;
+  return { counts, total };
+}
+
 /**
  * Records an outbound click and returns the deep link so the client
  * component can open it. Keeping the open-in-new-tab call on the client
@@ -182,6 +270,8 @@ interface TitleFields {
   episodeCount?: number;
   coverImageUrl?: string;
   isPublished?: boolean;
+  editorialHookPoint?: "hooks_fast" | "slow_burn" | "filler_heavy";
+  editorialEndingType?: "happy" | "bittersweet" | "cliffhanger" | "unresolved";
 }
 
 /**

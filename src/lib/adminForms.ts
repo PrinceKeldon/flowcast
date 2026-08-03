@@ -37,6 +37,17 @@ function splitTags(value: string): string[] {
 function parseTitleFields(formData: FormData) {
   const pacing = optionalStr(formData, "pacing") as Pacing | undefined;
   const episodeCountRaw = optionalStr(formData, "episodeCount");
+  const editorialHookPoint = optionalStr(formData, "editorialHookPoint") as
+    | "hooks_fast"
+    | "slow_burn"
+    | "filler_heavy"
+    | undefined;
+  const editorialEndingType = optionalStr(formData, "editorialEndingType") as
+    | "happy"
+    | "bittersweet"
+    | "cliffhanger"
+    | "unresolved"
+    | undefined;
 
   return {
     name: str(formData, "name"),
@@ -50,6 +61,8 @@ function parseTitleFields(formData: FormData) {
     episodeCount: episodeCountRaw ? Number(episodeCountRaw) : undefined,
     coverImageUrl: optionalStr(formData, "coverImageUrl"),
     isPublished: formData.get("isPublished") === "on",
+    editorialHookPoint,
+    editorialEndingType,
   };
 }
 

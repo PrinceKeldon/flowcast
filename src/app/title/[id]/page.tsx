@@ -10,6 +10,8 @@ import { isAdminSession } from "@/lib/admin";
 import { WatchButton } from "@/components/WatchButton";
 import { ReactionsList } from "@/components/ReactionsList";
 import { ReactionTap } from "@/components/ReactionTap";
+import { SkipMeter } from "@/components/SkipMeter";
+import { getHookVoteSummary } from "@/lib/actions";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { TaxonomySignal } from "@/components/TaxonomySignal";
 import { TitleCoverArt } from "@/components/TitleCoverArt";
@@ -95,6 +97,16 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
     : null;
   const initialReactedEmoji = (priorReaction?.metadata as { emoji?: string } | undefined)?.emoji ?? null;
 
+  const priorHookVote = existingSessionId
+    ? await prisma.userInteraction.findFirst({
+        where: { sessionId: existingSessionId, titleId: title.id, action: "hook_vote" },
+        select: { metadata: true },
+      })
+    : null;
+  const initialVotedBucket =
+    (priorHookVote?.metadata as { hookedAt?: "ep1" | "ep3" | "ep9" | "never" } | undefined)?.hookedAt ?? null;
+  const hookVoteSummary = await getHookVoteSummary(title.id);
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-14 pb-20">
       <ViewLogger titleId={title.id} />
@@ -131,6 +143,14 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
               <p className="text-[var(--text-muted)]">No active platform links yet.</p>
             )}
           </div>
+
+          <SkipMeter
+            titleId={title.id}
+            editorialHookPoint={title.editorialHookPoint}
+            editorialEndingType={title.editorialEndingType}
+            initialVotedBucket={initialVotedBucket}
+            voteSummary={hookVoteSummary}
+          />
 
           {/* Editorial reactions before raw taxonomy — see ARCHITECTURE.md */}
           <ReactionsList reactions={title.reactions} />

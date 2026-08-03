@@ -646,3 +646,87 @@ the card grid) rather than a parallel rail component — the only thing
 that differs between the two trending rails is the query and the label
 passed in.
 
+## Skip Meter + metadata field reframing
+
+**Skip Meter** is the genre-specific "killer feature" this app was
+missing — vertical-drama viewers' real anxieties are padding, slow
+starts, and unclear payoff, and this addresses that directly rather
+than with generic streaming-app fluff. Built in two stages, both live
+in the codebase now even though Stage 2's *display* stays gated behind
+real traffic — same discipline as the behavioral match-score blend.
+
+**Stage 1 (editorial)** — `Title.editorialHookPoint` /
+`editorialEndingType`, filled in via `/admin/titles/new` and the edit
+page. This is the curator's own honest read, not a fake aggregate —
+and deliberately scoped to what's actually achievable: the curator
+can't realistically watch every episode of every title added, so
+`hookPoint` (hooks fast / slow burn / filler-heavy) is the primary
+field, genuinely judgeable from 1-2 episodes, while `endingType` is
+optional and only meant to be filled in once a title's actually been
+finished — never guessed to fill the field.
+
+**Stage 2 (community)** — the "when did it hook you?" vote
+(`SkipMeter.tsx`, same UI on `/title/[id]`), using the exact same
+anonymous one-vote-per-session-per-title infrastructure as the
+reaction tap: a new `hook_vote` `InteractionAction`, metadata
+`{ hookedAt: "ep1" | "ep3" | "ep9" | "never" }`, enforced by another
+partial unique index (see schema.prisma's comment on
+`UserInteraction`, and the three-migration split in
+`prisma/migrations/` — `20260803120000_add_skip_meter_editorial_fields`
+for the new enum types + Title columns in one safe transaction, then
+`20260803120100_add_hook_vote_interaction_action` and
+`20260803120200_add_hook_vote_uniqueness_index` split the same way as
+`reacted` was, for the same Postgres enum-commit reason).
+
+The one non-negotiable piece: `getHookVoteSummary()` in `actions.ts`
+won't return an aggregate below `MIN_VOTES_FOR_SKIP_METER_DISPLAY`
+(mirrors `matching.ts`'s `MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL` —
+same reasoning, a handful of votes isn't a real signal, it's noise
+wearing a percentage sign). Voting still works and still counts below
+that threshold — the vote buttons always render — only the aggregate
+stat display waits for real sample size, silently, the same way
+`TrendingRail`/`FandomTrendingRail` render nothing rather than an
+empty or fake list. Built now, sitting there, validated by real
+traffic rather than blocked on it.
+
+Aggregation happens in application code (fetch every `hook_vote` row
+for a title, tally in JS) rather than a database `GROUP BY`, because
+`hookedAt` lives inside the `metadata` JSON column, which Prisma's
+typed `groupBy` can't group by directly — same reasoning `duplicate.ts`
+already used for title-similarity comparison. Fine at this project's
+scale; revisit if a single title's vote count ever gets large.
+
+**Metadata field reframing**, prompted by real curation friction:
+
+- *Language* was answering the wrong question. The field isn't
+  "original production language" (often unknowable, and not what a
+  viewer choosing what to watch actually needs) — it's "what can
+  someone watch this in, on Kilig, right now." Relabeled to "Viewing
+  language" on both admin forms, defaults to `en` since that's true
+  for everything currently curated. If a title later has multiple
+  confirmed dub/sub options worth showing, that's a real reason to
+  make this an array — not built now for a problem that doesn't exist
+  yet.
+- *Country of origin* and *availability regions* are both captured in
+  the admin but not displayed anywhere on the public site yet — so
+  both admin forms now say so directly ("Not shown publicly yet — skip
+  if unsure") rather than silently costing the curator research time
+  on fields with zero current effect. If region-aware display ever
+  becomes real, that's the moment to define an honest convention for
+  "confirmed everywhere" vs. "unconfirmed" — not before.
+- *Episode count* auto-fetch was added to `fetchTitleMetadata.ts`,
+  alongside name/synopsis/cover-image. Two-tier, honestly labeled:
+  schema.org JSON-LD `numberOfEpisodes` first (genuinely reliable when
+  a platform includes it), falling back to matching phrasing like "24
+  Episodes" in the page's visible text (a real best-effort guess, not
+  a guarantee). `episodeCountSource` on the result tells
+  `TitleDetailsFetcher.tsx` which path produced it, so the admin form
+  shows a confidence note rather than presenting a text-pattern guess
+  with the same weight as structured data — and editing the field
+  manually clears that provenance, since it's no longer attributable
+  to the fetch. This required removing the old head-only byte-read
+  shortcut in `fetchTitleMetadata.ts` (episode counts can live in the
+  body, not just `<head>`), so the byte cap moved from 200KB to 400KB
+  to compensate.
+
+
