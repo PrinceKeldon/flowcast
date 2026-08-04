@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { createTitleAction, type CreateTitleFormState } from "@/lib/adminForms";
 import { TitleDetailsFetcher } from "@/components/admin/TitleDetailsFetcher";
+import { TagPicker, type TagOption } from "@/components/admin/TagPicker";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-marigold)] focus:outline-none";
@@ -13,9 +14,11 @@ const initialState: CreateTitleFormState = {};
 interface NewTitleFormProps {
   /** For the season picker — every existing title, so "this is Season 2 of X" can point at Season 1. */
   titles: { id: string; name: string }[];
+  tropeTagOptions: TagOption[];
+  moodTagOptions: TagOption[];
 }
 
-export function NewTitleForm({ titles }: NewTitleFormProps) {
+export function NewTitleForm({ titles, tropeTagOptions, moodTagOptions }: NewTitleFormProps) {
   const [state, formAction, isPending] = useActionState(createTitleAction, initialState);
 
   return (
@@ -44,15 +47,9 @@ export function NewTitleForm({ titles }: NewTitleFormProps) {
         </div>
       </div>
 
-      <div>
-        <label className={labelClass} htmlFor="tropeTags">Trope tags (comma-separated)</label>
-        <input id="tropeTags" name="tropeTags" placeholder="revenge, billionaire" className={inputClass} />
-      </div>
+      <TagPicker name="tropeTags" label="Trope tags" availableTags={tropeTagOptions} accent="trope" />
 
-      <div>
-        <label className={labelClass} htmlFor="moodTags">Mood tags (comma-separated)</label>
-        <input id="moodTags" name="moodTags" placeholder="high_drama, longing" className={inputClass} />
-      </div>
+      <TagPicker name="moodTags" label="Mood tags" availableTags={moodTagOptions} accent="mood" />
 
       <div>
         <label className={labelClass} htmlFor="castType">Cast type</label>
