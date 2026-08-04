@@ -1,15 +1,4 @@
-"use client";
-
-import { useState, useTransition } from "react";
-import { logHookVote, getMyHookVote } from "@/lib/actions";
-import type { HookVoteBucket } from "@/lib/actions";
-
-const VOTE_OPTIONS: { bucket: HookVoteBucket; label: string }[] = [
-  { bucket: "ep1", label: "Ep 1" },
-  { bucket: "ep3", label: "Ep 3" },
-  { bucket: "ep9", label: "Ep 9" },
-  { bucket: "never", label: "Never" },
-];
+import { logHookVoteFromForm } from "@/lib/actions";
 
 const HOOK_POINT_LABELS: Record<string, string> = {
   hooks_fast: "Hooks fast",
@@ -28,48 +17,35 @@ interface SkipMeterProps {
   titleId: string;
   editorialHookPoint: string | null;
   editorialEndingType: string | null;
-  /** Computed server-side via a read-only session peek — see title/[id]/page.tsx. */
-  initialVotedBucket: HookVoteBucket | null;
+  /** Used as the number input's max — omitted (no upper bound shown) when unknown. */
+  episodeCount: number | null;
+  /**
+   * Computed server-side in title/[id]/page.tsx via a read-only
+   * session peek. null means "hasn't voted yet" (show the form); a
+   * value (including hookedAtEpisode: null for "never") means this
+   * session already voted (show that instead of the form — the
+   * database is the only source of truth here, there's no client-side
+   * state to keep in sync with it).
+   */
+  priorVote: { hookedAtEpisode: number | null } | null;
   /**
    * Already threshold-gated server-side (see MIN_VOTES_FOR_SKIP_METER_DISPLAY
    * in actions.ts) — null here means "don't show an aggregate yet",
    * not "no votes at all". Voting still works either way.
    */
-  voteSummary: { counts: Record<HookVoteBucket, number>; total: number } | null;
+  voteSummary: { total: number; neverCount: number; medianEpisode: number | null } | null;
 }
 
 export function SkipMeter({
   titleId,
   editorialHookPoint,
   editorialEndingType,
-  initialVotedBucket,
+  episodeCount,
+  priorVote,
   voteSummary,
 }: SkipMeterProps) {
-  const [votedBucket, setVotedBucket] = useState<HookVoteBucket | null>(initialVotedBucket);
-  const [pendingBucket, setPendingBucket] = useState<HookVoteBucket | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const hasVoted = votedBucket !== null;
   const hasEditorial = editorialHookPoint || editorialEndingType;
-
-  function handleVote(bucket: HookVoteBucket) {
-    if (hasVoted || isPending) return;
-
-    setPendingBucket(bucket);
-    startTransition(async () => {
-      const result = await logHookVote(titleId, bucket);
-
-      if (result.ok) {
-        setVotedBucket(bucket);
-      } else if (result.alreadyVoted) {
-        // Same reasoning as ReactionTap's race-condition fallback —
-        // don't assume the just-tapped bucket is the one that landed.
-        const actual = await getMyHookVote(titleId);
-        setVotedBucket(actual ?? bucket);
-      }
-      setPendingBucket(null);
-    });
-  }
+  const submitVote = logHookVoteFromForm.bind(null, titleId);
 
   return (
     <div className="mb-7 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -90,52 +66,55 @@ export function SkipMeter({
         </div>
       )}
 
-      <p className="mb-2 text-sm text-[var(--text)]">When did it hook you?</p>
-      <div className="flex gap-2">
-        {VOTE_OPTIONS.map(({ bucket, label }) => {
-          const isThisOne = votedBucket === bucket;
-          const isThisPending = pendingBucket === bucket && isPending;
-          return (
-            <button
-              key={bucket}
-              type="button"
-              onClick={() => handleVote(bucket)}
-              disabled={hasVoted || isPending}
-              aria-pressed={isThisOne}
-              className={`rounded-full border px-3 py-1.5 font-mono text-xs uppercase transition-all ${
-                isThisOne
-                  ? "border-[var(--accent-marigold)] bg-[var(--accent-marigold)]/10 text-[var(--text)]"
-                  : "border-[var(--border)] text-[var(--text-muted)]"
-              } ${hasVoted && !isThisOne ? "opacity-40" : ""} ${
-                !hasVoted && !isPending ? "hover:border-[var(--accent-marigold)]" : ""
-              } ${isThisPending ? "animate-pulse" : ""}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {voteSummary ? (
-        <div className="mt-4">
-          {VOTE_OPTIONS.map(({ bucket, label }) => {
-            const pct = Math.round((voteSummary.counts[bucket] / voteSummary.total) * 100);
-            return (
-              <div key={bucket} className="mb-1.5 flex items-center gap-2">
-                <span className="w-10 shrink-0 font-mono text-[11px] text-[var(--text-muted)]">{label}</span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg)]">
-                  <div className="h-full rounded-full bg-[var(--accent-marigold)]" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="w-9 shrink-0 text-right font-mono text-[11px] text-[var(--text-muted)]">{pct}%</span>
-              </div>
-            );
-          })}
-          <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-            {voteSummary.total} votes
-          </p>
-        </div>
+      {priorVote ? (
+        <p className="text-sm text-[var(--text)]">
+          {priorVote.hookedAtEpisode === null ? (
+            "You said this one never hooked you."
+          ) : (
+            <>
+              You said episode <span className="font-semibold">{priorVote.hookedAtEpisode}</span> hooked you.
+            </>
+          )}
+        </p>
       ) : (
-        <p className="mt-2.5 text-xs text-[var(--text-muted)]">Results show once enough people vote.</p>
+        <form action={submitVote} className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor={`hookedAtEpisode-${titleId}`} className="mb-1 block text-sm text-[var(--text)]">
+              Which episode hooked you?
+            </label>
+            <input
+              id={`hookedAtEpisode-${titleId}`}
+              name="hookedAtEpisode"
+              type="number"
+              min={1}
+              max={episodeCount ?? undefined}
+              placeholder={episodeCount ? `1–${episodeCount}` : "Episode #"}
+              className="w-28 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent-marigold)] focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-xl bg-[var(--accent-marigold)] px-4 py-2 text-sm font-semibold text-[var(--bg)] transition-opacity hover:opacity-90"
+          >
+            Submit
+          </button>
+          <button
+            type="submit"
+            name="neverHooked"
+            value="on"
+            className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-muted)] transition-colors hover:border-[var(--accent-rose)] hover:text-[var(--accent-rose)]"
+          >
+            Never got into it
+          </button>
+        </form>
+      )}
+
+      {voteSummary && (
+        <p className="mt-3 font-mono text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+          {voteSummary.medianEpisode !== null && `Median hook point: Episode ${voteSummary.medianEpisode} · `}
+          {Math.round((voteSummary.neverCount / voteSummary.total) * 100)}% never got into it · {voteSummary.total}{" "}
+          votes
+        </p>
       )}
     </div>
   );

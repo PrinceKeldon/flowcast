@@ -95,10 +95,21 @@ export async function getReactedEmoji(titleId: string): Promise<string | null> {
 // Skip Meter Stage 2 — "when did it hook you?" community vote. Same
 // anonymous, one-per-session-per-title shape as the reaction tap
 // above (partial unique index — see schema.prisma), on the same
-// UserInteraction table via the `hook_vote` action, distinguishing
-// which bucket via `metadata: { hookedAt }`.
-export const HOOK_VOTE_BUCKETS = ["ep1", "ep3", "ep9", "never"] as const;
-export type HookVoteBucket = (typeof HOOK_VOTE_BUCKETS)[number];
+// UserInteraction table via the `hook_vote` action.
+//
+// Deliberately NOT fixed buckets (an earlier version of this used
+// ep1/ep3/ep9/never across every title) — episode count varies
+// wildly across this catalogue, from a handful of episodes to over a
+// hundred, so a fixed "Ep 9" checkpoint is meaningless for a 6-episode
+// title and far too coarse for a 60-episode one. metadata stores the
+// exact episode number instead: { hookedAtEpisode: number | null },
+// null meaning "never got into it" rather than a missing value.
+//
+// This is a real <form action> (see SkipMeter.tsx), not a client
+// useTransition call like logReaction() — matches this app's dominant
+// server-first pattern, and means SkipMeter doesn't need to be a
+// Client Component for this part at all: the page just re-renders
+// from the database on the next request after submission.
 
 // Mirrors MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL in matching.ts — same
 // reasoning: a handful of votes isn't a real signal, it's noise
@@ -108,77 +119,99 @@ export type HookVoteBucket = (typeof HOOK_VOTE_BUCKETS)[number];
 // ARCHITECTURE.md's Skip Meter section for why this is non-negotiable.
 const MIN_VOTES_FOR_SKIP_METER_DISPLAY = 5;
 
-/** Records an anonymous hook-vote. Same shape/reasoning as logReaction() above. */
-export async function logHookVote(
-  titleId: string,
-  hookedAt: HookVoteBucket
-): Promise<{ ok: true } | { ok: false; alreadyVoted: boolean }> {
+// Defensive upper bound for titles with no known episodeCount, where
+// there's nothing to validate the submitted episode against — not a
+// real product constraint, just a guard against garbage/abuse input.
+const MAX_PLAUSIBLE_EPISODE = 500;
+
+/**
+ * Records an anonymous hook-vote from a real form submission (see
+ * SkipMeter.tsx) — bound to titleId via .bind(null, titleId) at the
+ * call site, same pattern as addReactionFromForm etc. in adminForms.ts.
+ * Never throws into the caller and has no return value on purpose:
+ * a form action's result is "the page re-renders", not a value the
+ * caller branches on — invalid/duplicate submissions just no-op
+ * rather than erroring, and revalidatePath() picks up a real success.
+ */
+export async function logHookVoteFromForm(titleId: string, formData: FormData): Promise<void> {
+  const neverHooked = formData.get("neverHooked") === "on";
+  const rawEpisode = formData.get("hookedAtEpisode");
+  const hookedAtEpisode = neverHooked ? null : rawEpisode ? Number(rawEpisode) : null;
+
+  if (!neverHooked) {
+    if (hookedAtEpisode === null || !Number.isInteger(hookedAtEpisode) || hookedAtEpisode < 1) {
+      return; // not a valid episode number — drop rather than record garbage
+    }
+    // Validate against the title's actual length server-side — never
+    // trust the form's client-side `max` attribute alone, that's a
+    // UX hint, not enforcement.
+    const title = await prisma.title.findUnique({ where: { id: titleId }, select: { episodeCount: true } });
+    const upperBound = title?.episodeCount ?? MAX_PLAUSIBLE_EPISODE;
+    if (hookedAtEpisode > upperBound) return;
+  }
+
   try {
     const sessionId = await getSessionId();
     await prisma.userInteraction.create({
-      data: {
-        sessionId,
-        titleId,
-        action: "hook_vote",
-        metadata: { hookedAt },
-      },
+      data: { sessionId, titleId, action: "hook_vote", metadata: { hookedAtEpisode } },
     });
-    return { ok: true };
+    revalidatePath(`/title/${titleId}`);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return { ok: false, alreadyVoted: true };
+      return; // already voted this session — not an error, just a no-op
     }
     console.error("Failed to log hook vote", err);
-    return { ok: false, alreadyVoted: false };
   }
-}
-
-/** Race-condition fallback for SkipMeter.tsx — same reasoning as getReactedEmoji(). */
-export async function getMyHookVote(titleId: string): Promise<HookVoteBucket | null> {
-  const sessionId = await getSessionId();
-  const existing = await prisma.userInteraction.findFirst({
-    where: { sessionId, titleId, action: "hook_vote" },
-    select: { metadata: true },
-  });
-  if (!existing) return null;
-  const metadata = existing.metadata as { hookedAt?: string };
-  return HOOK_VOTE_BUCKETS.includes(metadata.hookedAt as HookVoteBucket)
-    ? (metadata.hookedAt as HookVoteBucket)
-    : null;
 }
 
 /**
  * Tallies hook-votes for a title, gated by MIN_VOTES_FOR_SKIP_METER_DISPLAY
  * (see above) — returns null below threshold, never a stat built on a
- * handful of taps. Aggregates in application code rather than a
- * database GROUP BY: `hookedAt` lives inside the `metadata` JSON
- * column, which Prisma's typed groupBy can't group by directly, and
- * per-title vote volume is small enough at this project's scale that
- * fetching every row and tallying in JS is simpler and safer than
- * reaching for raw SQL — same call duplicate.ts already made for
- * title-similarity comparison. Revisit if a single title's vote count
- * ever gets large enough for that fetch to matter.
+ * handful of taps. Reports the *median* hooked-at episode, not the
+ * mean — median resists getting dragged around by one outlier vote
+ * ("episode 47") the way an average would at these small sample
+ * sizes, which matters more here than it would with real volume.
+ *
+ * Aggregates in application code rather than a database query:
+ * hookedAtEpisode lives inside the `metadata` JSON column, which
+ * Prisma can't median/group by directly, and per-title vote volume is
+ * small enough at this project's scale that fetching every row and
+ * computing in JS is simpler and safer than reaching for raw SQL —
+ * same call duplicate.ts already made for title-similarity comparison.
+ * Revisit if a single title's vote count ever gets large.
  */
 export async function getHookVoteSummary(
   titleId: string
-): Promise<{ counts: Record<HookVoteBucket, number>; total: number } | null> {
+): Promise<{ total: number; neverCount: number; medianEpisode: number | null } | null> {
   const rows = await prisma.userInteraction.findMany({
     where: { titleId, action: "hook_vote" },
     select: { metadata: true },
   });
 
-  const counts: Record<HookVoteBucket, number> = { ep1: 0, ep3: 0, ep9: 0, never: 0 };
-  for (const row of rows) {
-    const hookedAt = (row.metadata as { hookedAt?: string } | null)?.hookedAt;
-    if (hookedAt && HOOK_VOTE_BUCKETS.includes(hookedAt as HookVoteBucket)) {
-      counts[hookedAt as HookVoteBucket]++;
-    }
-  }
-
   const total = rows.length;
   if (total < MIN_VOTES_FOR_SKIP_METER_DISPLAY) return null;
-  return { counts, total };
+
+  const hookedEpisodes: number[] = [];
+  let neverCount = 0;
+  for (const row of rows) {
+    const value = (row.metadata as { hookedAtEpisode?: number | null } | null)?.hookedAtEpisode;
+    if (value === null || value === undefined) neverCount++;
+    else if (Number.isInteger(value) && value > 0) hookedEpisodes.push(value);
+  }
+
+  hookedEpisodes.sort((a, b) => a - b);
+  const mid = Math.floor(hookedEpisodes.length / 2);
+  const medianEpisode =
+    hookedEpisodes.length === 0
+      ? null
+      : hookedEpisodes.length % 2 === 0
+        ? Math.round((hookedEpisodes[mid - 1] + hookedEpisodes[mid]) / 2)
+        : hookedEpisodes[mid];
+
+  return { total, neverCount, medianEpisode };
 }
+
+
 
 /**
  * Records an outbound click and returns the deep link so the client
