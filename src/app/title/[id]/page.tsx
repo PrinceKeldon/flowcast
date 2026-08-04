@@ -103,8 +103,14 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
         select: { metadata: true },
       })
     : null;
-  const initialVotedBucket =
-    (priorHookVote?.metadata as { hookedAt?: "ep1" | "ep3" | "ep9" | "never" } | undefined)?.hookedAt ?? null;
+  // metadata.hookedAtEpisode is itself nullable ("never got into it"),
+  // so this can't just be `?? null` — that would collapse "voted
+  // never" into "hasn't voted", losing the distinction the form and
+  // getHookVoteSummary() both rely on. priorVote is only null when no
+  // row was found at all.
+  const priorVote = priorHookVote
+    ? { hookedAtEpisode: (priorHookVote.metadata as { hookedAtEpisode: number | null }).hookedAtEpisode }
+    : null;
   const hookVoteSummary = await getHookVoteSummary(title.id);
 
   return (
@@ -148,7 +154,8 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
             titleId={title.id}
             editorialHookPoint={title.editorialHookPoint}
             editorialEndingType={title.editorialEndingType}
-            initialVotedBucket={initialVotedBucket}
+            episodeCount={title.episodeCount}
+            priorVote={priorVote}
             voteSummary={hookVoteSummary}
           />
 

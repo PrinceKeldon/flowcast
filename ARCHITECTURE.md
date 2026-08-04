@@ -666,35 +666,61 @@ optional and only meant to be filled in once a title's actually been
 finished — never guessed to fill the field.
 
 **Stage 2 (community)** — the "when did it hook you?" vote
-(`SkipMeter.tsx`, same UI on `/title/[id]`), using the exact same
-anonymous one-vote-per-session-per-title infrastructure as the
-reaction tap: a new `hook_vote` `InteractionAction`, metadata
-`{ hookedAt: "ep1" | "ep3" | "ep9" | "never" }`, enforced by another
-partial unique index (see schema.prisma's comment on
-`UserInteraction`, and the three-migration split in
-`prisma/migrations/` — `20260803120000_add_skip_meter_editorial_fields`
-for the new enum types + Title columns in one safe transaction, then
+(`SkipMeter.tsx`, on `/title/[id]`), using the same anonymous
+one-vote-per-session-per-title infrastructure as the reaction tap: a
+new `hook_vote` `InteractionAction`, enforced by another partial
+unique index (see schema.prisma's comment on `UserInteraction`, and
+the three-migration split in `prisma/migrations/` —
+`20260803120000_add_skip_meter_editorial_fields` for the new enum
+types + Title columns in one safe transaction, then
 `20260803120100_add_hook_vote_interaction_action` and
 `20260803120200_add_hook_vote_uniqueness_index` split the same way as
 `reacted` was, for the same Postgres enum-commit reason).
+
+*Exact episode number, not fixed buckets.* An earlier version of this
+used fixed checkpoints (ep1/ep3/ep9/never) across every title — wrong,
+caught during manual testing: episode count varies from a handful to
+over a hundred across this catalogue, so a fixed "Ep 9" option doesn't
+exist for a 6-episode title and is far too coarse for a 60-episode
+one. `metadata` instead stores the literal episode number:
+`{ hookedAtEpisode: number | null }`, `null` meaning "never got into
+it" rather than a missing value. `logHookVoteFromForm()` in
+`actions.ts` validates the submitted number against the title's actual
+`episodeCount` server-side — the form's `max` attribute is a UX hint,
+never enforcement.
+
+*A real `<form action>`, not a client `useTransition` call.* Unlike
+`ReactionTap.tsx`/`logReaction()`, this isn't a justified Client
+Component island — it's a genuine form submission, matching this
+app's dominant server-first pattern more closely than the earlier tap-
+button version did. `SkipMeter.tsx` has no `"use client"` at all: it
+renders the form when `priorVote` (computed server-side via the same
+read-only session peek as the reaction lookup) is `null`, or the
+recorded vote as plain text when it isn't — the database is the only
+source of truth, there's no client state to keep in sync with it. A
+submission just makes the page re-render on the next request.
 
 The one non-negotiable piece: `getHookVoteSummary()` in `actions.ts`
 won't return an aggregate below `MIN_VOTES_FOR_SKIP_METER_DISPLAY`
 (mirrors `matching.ts`'s `MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL` —
 same reasoning, a handful of votes isn't a real signal, it's noise
 wearing a percentage sign). Voting still works and still counts below
-that threshold — the vote buttons always render — only the aggregate
-stat display waits for real sample size, silently, the same way
+that threshold — the form always renders — only the aggregate stat
+display waits for real sample size, silently, the same way
 `TrendingRail`/`FandomTrendingRail` render nothing rather than an
 empty or fake list. Built now, sitting there, validated by real
-traffic rather than blocked on it.
+traffic rather than blocked on it. The aggregate reports the *median*
+hooked-at episode, not the mean — median resists one outlier vote
+("episode 47") dragging the number around at these small sample sizes,
+which matters more here than with real volume.
 
 Aggregation happens in application code (fetch every `hook_vote` row
-for a title, tally in JS) rather than a database `GROUP BY`, because
-`hookedAt` lives inside the `metadata` JSON column, which Prisma's
-typed `groupBy` can't group by directly — same reasoning `duplicate.ts`
-already used for title-similarity comparison. Fine at this project's
-scale; revisit if a single title's vote count ever gets large.
+for a title, compute the median in JS) rather than a database query,
+because `hookedAtEpisode` lives inside the `metadata` JSON column,
+which Prisma can't median/group by directly — same reasoning
+`duplicate.ts` already used for title-similarity comparison. Fine at
+this project's scale; revisit if a single title's vote count ever
+gets large.
 
 **Metadata field reframing**, prompted by real curation friction:
 
