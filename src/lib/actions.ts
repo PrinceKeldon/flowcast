@@ -305,6 +305,8 @@ interface TitleFields {
   isPublished?: boolean;
   editorialHookPoint?: "hooks_fast" | "slow_burn" | "filler_heavy";
   editorialEndingType?: "happy" | "bittersweet" | "cliffhanger" | "unresolved";
+  seasonOfId?: string;
+  seasonNumber?: number;
 }
 
 /**

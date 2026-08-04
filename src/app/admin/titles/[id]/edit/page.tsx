@@ -21,6 +21,12 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
   const title = await prisma.title.findUnique({ where: { id } });
   if (!title) notFound();
 
+  const otherTitles = await prisma.title.findMany({
+    where: { id: { not: title.id } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
   const updateThisTitle = updateTitleFromForm.bind(null, title.id);
 
   return (
@@ -133,6 +139,29 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
               <option value="unresolved">Unresolved</option>
             </select>
             <p className="mt-1 text-xs text-[var(--text-muted)]">Only fill in once you&apos;ve actually finished it.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass} htmlFor="seasonOfId">This is a season of (optional)</label>
+            <select id="seasonOfId" name="seasonOfId" defaultValue={title.seasonOfId ?? ""} className={inputClass}>
+              <option value="">— standalone title —</option>
+              {otherTitles.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="seasonNumber">Season number</label>
+            <input
+              id="seasonNumber"
+              name="seasonNumber"
+              type="number"
+              min={1}
+              defaultValue={title.seasonNumber ?? undefined}
+              className={inputClass}
+            />
           </div>
         </div>
 

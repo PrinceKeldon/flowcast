@@ -11,6 +11,16 @@
  * confidence score for auto-merging; see DuplicatePolicy in types.ts
  * — "review" is the safe default for a reason.
  *
+ * Two callers: the Discovery Engine's mission runner (mission.ts),
+ * and — despite living under lib/discovery/ — createTitleAction() in
+ * lib/adminForms.ts, the actual primary title-creation path now that
+ * automated platform crawling was walked back to manual entry. It was
+ * only ever wired into the former for a while, which meant the path
+ * almost everything goes through had no duplicate protection at all.
+ * Not moved out of lib/discovery/ since nothing here is
+ * Discovery-Engine-specific and a move risked breaking the existing
+ * caller for no real benefit.
+ *
  * At catalogue sizes in the low thousands, comparing against every
  * existing title per import is fine. If this ever needs to scale
  * past that, swap the findMany() below for a Postgres pg_trgm

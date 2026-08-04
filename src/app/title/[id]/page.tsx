@@ -113,6 +113,22 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
     : null;
   const hookVoteSummary = await getHookVoteSummary(title.id);
 
+  // "Season" here means a distinct, independently-linked Title row —
+  // see schema.prisma's comment on Title.seasonOfId for why. Root is
+  // this title itself if it has no seasonOfId, or whatever it points
+  // at otherwise — every season in a group points at the same root,
+  // so this is one query rather than a recursive walk.
+  const seasonRootId = title.seasonOfId ?? title.id;
+  const seasons = await prisma.title.findMany({
+    where: {
+      isPublished: true,
+      OR: [{ id: seasonRootId }, { seasonOfId: seasonRootId }],
+    },
+    select: { id: true, name: true, seasonNumber: true, coverImageUrl: true },
+    orderBy: { seasonNumber: "asc" },
+  });
+  const otherSeasons = seasons.filter((s: { id: string }) => s.id !== title.id);
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-14 pb-20">
       <ViewLogger titleId={title.id} />
@@ -138,6 +154,25 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
           <h1 className="mb-4 break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)]">
             {title.name}
           </h1>
+
+          {otherSeasons.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Seasons:</span>
+              {seasons.map((s: { id: string; name: string; seasonNumber: number | null }) => (
+                <Link
+                  key={s.id}
+                  href={`/title/${s.id}`}
+                  className={`rounded-full border px-2.5 py-1 font-mono text-[11px] uppercase transition-colors ${
+                    s.id === title.id
+                      ? "border-[var(--accent-marigold)] bg-[var(--accent-marigold)]/10 text-[var(--text)]"
+                      : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent-marigold)]"
+                  }`}
+                >
+                  {s.seasonNumber ? `Season ${s.seasonNumber}` : "Season 1"}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {title.synopsis && <p className="mb-7 leading-relaxed text-[var(--text)]">{title.synopsis}</p>}
 
