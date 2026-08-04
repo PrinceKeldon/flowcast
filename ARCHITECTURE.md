@@ -819,3 +819,20 @@ the same justified-exception reasoning as every other Client Component
 in this app, not a drift away from "prefer plain
 `<form action={serverAction}>`."
 
+## Trope/mood tag picker (`TagPicker.tsx`)
+
+The new-title and edit forms used to ask for trope/mood tags as a
+plain comma-separated text field — meaning the admin had to remember
+and retype the exact existing tag spelling every time to avoid
+accidentally forking the taxonomy (`guilty_pleasure` vs
+`guilty pleasure` vs `Guilty_Pleasure` becoming three different tags).
+`TagPicker.tsx` shows every already-registered `TagDefinition` for
+that category (trope reads marigold, mood reads rose — same
+convention as the public `MoodChipBar.tsx`) as click-to-toggle chips,
+with a plain text field underneath still open for anything genuinely
+new. Both write into the same hidden `<input>`, in the same
+comma-separated format the old plain field always submitted — so
+`parseTitleFields()` / `normalizeAndRegisterTags()` in `actions.ts`
+and `adminForms.ts` needed zero changes; as far as the backend's
+concerned, nothing about the field changed at all.
+

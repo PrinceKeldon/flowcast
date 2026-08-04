@@ -16,6 +16,18 @@ export default async function NewTitlePage() {
     orderBy: { name: "asc" },
   });
 
+  const tagDefinitions = await prisma.tagDefinition.findMany({
+    where: { category: { in: ["trope", "mood"] }, isActive: true },
+    select: { category: true, value: true, label: true },
+    orderBy: { label: "asc" },
+  });
+  const tropeTagOptions = tagDefinitions
+    .filter((t: { category: string }) => t.category === "trope")
+    .map((t: { value: string; label: string }) => ({ value: t.value, label: t.label }));
+  const moodTagOptions = tagDefinitions
+    .filter((t: { category: string }) => t.category === "mood")
+    .map((t: { value: string; label: string }) => ({ value: t.value, label: t.label }));
+
   return (
     <main className="mx-auto max-w-xl px-6 py-14 pb-20">
       <Link
@@ -30,7 +42,7 @@ export default async function NewTitlePage() {
         New title
       </h1>
 
-      <NewTitleForm titles={titles} />
+      <NewTitleForm titles={titles} tropeTagOptions={tropeTagOptions} moodTagOptions={moodTagOptions} />
     </main>
   );
 }

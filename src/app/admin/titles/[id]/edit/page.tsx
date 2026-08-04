@@ -5,6 +5,7 @@ import { isAdminSession } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { updateTitleFromForm } from "@/lib/adminForms";
 import { TitleDetailsFetcher } from "@/components/admin/TitleDetailsFetcher";
+import { TagPicker } from "@/components/admin/TagPicker";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-marigold)] focus:outline-none";
@@ -26,6 +27,18 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
+
+  const tagDefinitions = await prisma.tagDefinition.findMany({
+    where: { category: { in: ["trope", "mood"] }, isActive: true },
+    select: { category: true, value: true, label: true },
+    orderBy: { label: "asc" },
+  });
+  const tropeTagOptions = tagDefinitions
+    .filter((t: { category: string }) => t.category === "trope")
+    .map((t: { value: string; label: string }) => ({ value: t.value, label: t.label }));
+  const moodTagOptions = tagDefinitions
+    .filter((t: { category: string }) => t.category === "mood")
+    .map((t: { value: string; label: string }) => ({ value: t.value, label: t.label }));
 
   const updateThisTitle = updateTitleFromForm.bind(null, title.id);
 
@@ -71,27 +84,21 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
           </div>
         </div>
 
-        <div>
-          <label className={labelClass} htmlFor="tropeTags">Trope tags (comma-separated)</label>
-          <input
-            id="tropeTags"
-            name="tropeTags"
-            defaultValue={title.tropeTags.join(", ")}
-            placeholder="revenge, billionaire"
-            className={inputClass}
-          />
-        </div>
+        <TagPicker
+          name="tropeTags"
+          label="Trope tags"
+          availableTags={tropeTagOptions}
+          defaultValues={title.tropeTags}
+          accent="trope"
+        />
 
-        <div>
-          <label className={labelClass} htmlFor="moodTags">Mood tags (comma-separated)</label>
-          <input
-            id="moodTags"
-            name="moodTags"
-            defaultValue={title.moodTags.join(", ")}
-            placeholder="high_drama, longing"
-            className={inputClass}
-          />
-        </div>
+        <TagPicker
+          name="moodTags"
+          label="Mood tags"
+          availableTags={moodTagOptions}
+          defaultValues={title.moodTags}
+          accent="mood"
+        />
 
         <div>
           <label className={labelClass} htmlFor="castType">Cast type</label>
