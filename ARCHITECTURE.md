@@ -755,4 +755,67 @@ gets large.
   body, not just `<head>`), so the byte cap moved from 200KB to 400KB
   to compensate.
 
+## Duplicate detection on manual creation + title seasons
+
+Two real gaps, found by asking rather than by testing, and related
+enough to fix together.
+
+**The gap:** `checkDuplicate()` (bigram-similarity name matching,
+`lib/discovery/duplicate.ts`) existed and worked, but was only ever
+called from the Discovery Engine's automated mission runner
+(`mission.ts`) — never from `/admin/titles/new`, the actual path
+almost every title gets created through now that platform
+auto-crawling was walked back to manual entry. Nothing stopped the
+same title (or the same URL) from being entered twice.
+
+**Why it couldn't just be wired in as a hard block:** vertical dramas
+routinely get sequel seasons, and this catalogue had no concept of
+that at all — "Show Name Season 2" would score as a near-duplicate of
+"Show Name" under the exact same check meant to catch accidental
+re-entry, with no way to say "yes, I know, that's intentional."
+Fixing the duplicate gap properly meant building season-linking first,
+not after.
+
+**Title seasons** (`Title.seasonOfId` / `seasonNumber` in
+schema.prisma, migration `20260804120000_add_title_seasons`): Season
+2+ is its own independent `Title` row, not a bumped `episodeCount` on
+the original — confirmed against how these platforms actually work,
+Season 2 nearly always gets its own distinct watch link, sometimes on
+a different platform entirely, so it needs its own
+`Availability`/reactions/Skip Meter data. `seasonOfId` just links the
+rows: Season 1 (or a standalone title) has `seasonOfId = null`, every
+later season points back at the same root rather than chaining
+(season 3 → season 2 → season 1), so "show me every season" is one
+query (`id = root OR seasonOfId = root`) instead of a recursive walk.
+The public `/title/[id]` page shows a small Season 1 / Season 2 / …
+pill row when a title has siblings; the admin new-title and edit forms
+both get a "this is a season of" picker (a plain `<select>` of every
+existing title — fine at this catalogue's scale, would need real
+search if the list gets long).
+
+**Duplicate check, now wired into `createTitleAction()`** in
+`adminForms.ts`: runs `checkDuplicate()` on submission, skipped
+entirely when `seasonOfId` is set (an intentional near-duplicate name
+declaring itself as a season shouldn't trip the same check meant to
+catch accidents). Deliberately **warn, not block**: a match doesn't
+stop the save — the admin sees which existing title it resembles and
+how closely, checks an explicit "I know — create it anyway" box, and
+resubmits. Blocking outright was considered and rejected: a solo
+curator who already knows a near-match is intentional (and isn't
+using the season picker for some legitimate reason) shouldn't be
+locked out of their own catalogue.
+
+This needed a real behavior change to the create form, not just a
+`checkDuplicate()` call: showing a dynamic warning and letting the
+*same* form resubmit past it requires state to survive across
+submissions, which a plain `FormData → void` action (every other
+`*FromForm` function in `adminForms.ts`) has no way to carry. This is
+what `useActionState` is for, and there was already exactly one
+precedent for it in this codebase — `LoginForm.tsx` /
+`loginAdminAction()`, which reports a login error back the same way.
+`createTitleAction()` follows that shape, and the create form moved
+into a new Client Component (`NewTitleForm.tsx`) to host the hook —
+the same justified-exception reasoning as every other Client Component
+in this app, not a drift away from "prefer plain
+`<form action={serverAction}>`."
 

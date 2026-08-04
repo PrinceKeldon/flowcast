@@ -108,6 +108,21 @@ model Title {
   language          String
   countryOfOrigin   String?     @map("country_of_origin")
 
+  // Season 2+ of an existing show is its own independent Title row —
+  // on these platforms it near-always has its own distinct watch
+  // link/page, sometimes on a different platform entirely, so it
+  // needs its own Availability/reactions/Skip Meter data rather than
+  // being folded into the original row. This just links the rows.
+  // Season 1 (or a standalone title) has seasonOfId = null;
+  // Season 2+ points back at Season 1's id. Deliberately not a
+  // self-referencing chain (season 3 -> season 2 -> season 1) —
+  // everything points at the same root so "show me all seasons" is
+  // one query, not a recursive walk.
+  seasonOfId        String?     @map("season_of_id")
+  seasonOf          Title?      @relation("TitleSeasons", fields: [seasonOfId], references: [id], onDelete: SetNull)
+  seasons           Title[]     @relation("TitleSeasons")
+  seasonNumber      Int?        @map("season_number")
+
   // Taxonomy — normalized and auto-registered into TagDefinition by
   // createTitle() (see lib/actions.ts): typing a new tag grows the
   // vocabulary rather than being rejected, so TagDefinition stays a

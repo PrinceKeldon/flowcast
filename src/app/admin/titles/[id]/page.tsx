@@ -30,6 +30,10 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
   });
   if (!title) notFound();
 
+  const seasonOf = title.seasonOfId
+    ? await prisma.title.findUnique({ where: { id: title.seasonOfId }, select: { name: true } })
+    : null;
+
   const addAvailabilityForThisTitle = addAvailabilityFromForm.bind(null, title.id);
   const addReactionForThisTitle = addReactionFromForm.bind(null, title.id);
   const deleteThisTitle = deleteTitleFromForm.bind(null, title.id);
@@ -50,6 +54,14 @@ export default async function AdminTitleDetailPage({ params }: AdminTitleDetailP
       <h1 className="mb-2 break-words font-[var(--font-display)] text-2xl font-semibold uppercase text-[var(--text)]">
         {title.name}
       </h1>
+      {seasonOf && (
+        <p className="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">
+          Season {title.seasonNumber ?? "?"} of{" "}
+          <Link href={`/admin/titles/${title.seasonOfId}`} className="text-[var(--accent-marigold)] hover:underline">
+            {seasonOf.name}
+          </Link>
+        </p>
+      )}
       <div className="mb-7 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <Link href={`/title/${title.id}`} className="text-[var(--accent-marigold)] hover:underline">
           View public page →
