@@ -3,7 +3,7 @@
 -- treated as the "root") as its own independent Title row — see the
 -- comment on Title.seasonOfId in schema.prisma for why this is a link
 -- between rows rather than one row with a bumped episode count.
-ALTER TABLE "titles" ADD COLUMN "season_of_id" TEXT;
+ALTER TABLE "titles" ADD COLUMN "season_of_id" UUID;
 ALTER TABLE "titles" ADD COLUMN "season_number" INTEGER;
 
 -- CreateIndex
