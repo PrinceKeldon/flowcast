@@ -4,6 +4,7 @@ import { MOOD_CHIPS, DEFAULT_MOODS, findChip } from "@/lib/moodChips";
 import { MoodChipBar } from "@/components/MoodChipBar";
 import { SearchBar } from "@/components/SearchBar";
 import { TitleRail } from "@/components/TitleRail";
+import { IdentityNavLink } from "@/components/IdentityNavLink";
 
 export const dynamic = "force-dynamic"; // trending/rails depend on live interaction data
 
@@ -20,7 +21,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <main className="mx-auto max-w-6xl px-6 py-14 pb-20">
       <header className="mb-10">
-        <p className="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Kilig</p>
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <p className="font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Kilig</p>
+          <Suspense fallback={null}>
+            <IdentityNavLink />
+          </Suspense>
+        </div>
         <h1 className="mb-7 max-w-xl break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)] sm:text-4xl">
           What do you want to feel tonight?
         </h1>

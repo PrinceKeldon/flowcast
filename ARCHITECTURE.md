@@ -883,3 +883,76 @@ that.
 visual density adjustment on the homepage/rail cards, not touched
 anywhere else title text renders.
 
+## Collections — curation as identity, not a forum
+
+Kilig's earliest social feature was scoped as a discussion forum, then
+deliberately un-scoped. A forum with three quiet threads reads as
+failure — the whole point of a thread is other people replying — while
+a profile with three good Collections reads as complete and useful on
+day one, the same way a single good Letterboxd list or Spotify
+playlist is worth something before anyone follows it. Curation
+degrades gracefully at low density in a way discussion structurally
+can't, and it's a better fit for a product that already thinks in
+tags and match scores, not conversation. The hypothesis this MVP is
+built to test: **people will follow other people because they
+consistently curate great vertical dramas.** Everything else here is
+secondary to that one measurement.
+
+**Identity is deliberately the smallest thing that lets the
+experiment run.** A `Curator` (`schema.prisma`) is a claimed display
+name, nothing else — no password, no email, no profile fields. This
+is a third, separate identity concept from the two that already
+existed: the anonymous `sessionId` cookie (`session.ts`, powers
+interaction logging) and the single-shared-password admin gate
+(`admin.ts`, gates title-management mutations). None of those three
+were touched or unified — a real accounts system is a real future
+cost (see the "Not solved" list below), and building it speculatively
+ahead of validating the curation hypothesis would be the same mistake
+as building the forum. `curator.ts` mirrors `session.ts`'s
+read-vs-write split (`peekCuratorId()` never writes a cookie, safe
+in render bodies; the cookie is only ever set from
+`claimDisplayName()` in `curator-actions.ts`).
+
+**Collection is the primary object, not a post.** One curator, one
+name, one question it answers ("CEOs Worth Falling For"). Adding a
+title is one action: pick a Collection, write a note capped at 140
+characters (`NOTE_MAX_LENGTH` in `curator-actions.ts`), done — see
+`AddToCollectionWidget.tsx`. Re-adding a title already in the
+Collection edits its note (an upsert on the
+`[collectionId, titleId]` unique index) rather than erroring or
+duplicating, since editing your own note is a legitimate thing to
+want without a separate "edit" flow existing yet.
+
+**Follow is unconditional; the follower *count* is what's gated.**
+The `Follow` relationship is written from the first follow, always —
+holding that back would mean holding back the only way to actually
+measure the hypothesis. What's gated is what a stranger sees
+rendered from it: `getFollowerDisplay()` returns the real number to
+the curator viewing their own profile (truth matters, they're
+building something) and returns `null` — rendered as "New curator" —
+to anyone else until the count clears `MIN_FOLLOWERS_FOR_PUBLIC_DISPLAY`
+(5, the same threshold value as `MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL`
+in `matching.ts` and `MIN_VOTES_FOR_SKIP_METER_DISPLAY` in
+`actions.ts` — a small number isn't a real signal anywhere else in
+this app either, and a stat stamped "0" on a person's public identity
+is a worse "nobody's here" signal than an empty forum thread ever
+was). One-follow-per-pair is enforced by the database's
+`[followerId, followingId]` unique index, not a check-then-insert —
+`followCurator()` catches the resulting P2002 as "already following,"
+same pattern as `logReaction()`'s uniqueness handling.
+
+**Deliberately not built in this pass** (see the MVP scoping — these
+are all real, known costs, not oversights): full accounts
+(email/password/OAuth) — the claimed-name cookie is intentionally
+disposable, losing it loses the identity, and that tradeoff should
+get revisited once Collections prove out, not before; private or
+collaborative Collections (one type only — public, single-curator);
+comments or discussion on a Collection or its items (the note field
+*is* the only text surface, on purpose); a curator directory,
+trending-curators rail, or leaderboard (no social-proof-driven
+discovery yet, same "don't manufacture activity" reasoning as
+Trending's real threshold); moderation tooling beyond the 140-char
+cap itself (a short note is a smaller, slower-velocity surface than
+open comments, but it's still user-generated free text — this needs
+real moderation before it scales past a trusted pilot group).
+
