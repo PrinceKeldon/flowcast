@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MOOD_CHIPS, DEFAULT_MOODS, findChip } from "@/lib/moodChips";
 import { MoodChipBar } from "@/components/MoodChipBar";
@@ -24,7 +25,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <h1 className="mb-7 max-w-xl break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)] sm:text-4xl">
           What do you want to feel tonight?
         </h1>
-        <SearchBar />
+        <div className="mb-7 flex flex-wrap items-center gap-3">
+          <SearchBar className="mb-0" />
+          <Link
+            href="/titles"
+            className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 font-mono text-xs uppercase tracking-wide text-[var(--text)] transition-colors hover:border-[var(--accent-marigold)]"
+          >
+            Browse all
+          </Link>
+        </div>
         <MoodChipBar />
       </header>
 

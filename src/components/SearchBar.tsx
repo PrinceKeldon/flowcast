@@ -7,9 +7,15 @@ import { Search } from "lucide-react";
  * philosophy in ARCHITECTURE.md (MoodChipBar is the only place that
  * actually needs client-side interactivity).
  */
-export function SearchBar({ defaultValue = "" }: { defaultValue?: string }) {
+export function SearchBar({
+  defaultValue = "",
+  className = "mb-7",
+}: {
+  defaultValue?: string;
+  className?: string;
+}) {
   return (
-    <form action="/search" method="GET" className="mb-7 flex max-w-md items-center gap-2">
+    <form action="/search" method="GET" className={`${className} flex max-w-md items-center gap-2`}>
       <div className="flex flex-1 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 focus-within:border-[var(--accent-marigold)]">
         <Search size={16} className="text-[var(--text-muted)]" aria-hidden="true" />
         <input

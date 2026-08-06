@@ -22,7 +22,7 @@ const ICONS: Record<MoodChip["icon"], typeof Heart> = {
  * client-side fetch — while still feeling instant via Next.js's
  * client-side router cache.
  */
-export function MoodChipBar() {
+export function MoodChipBar({ basePath = "/" }: { basePath?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeMoods = searchParams.get("mood")?.split(",").filter(Boolean) ?? [];
@@ -38,7 +38,8 @@ export function MoodChipBar() {
     } else {
       params.delete("mood");
     }
-    router.push(`/?${params.toString()}`);
+    const qs = params.toString();
+    router.push(qs ? `${basePath}?${qs}` : basePath);
   };
 
   return (
