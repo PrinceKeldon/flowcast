@@ -132,6 +132,15 @@ model Title {
   moodTags          String[]    @map("mood_tags")
   pacing            Pacing?
   castType          String?     @map("cast_type")
+  // Actual named cast — deliberately separate from castType above,
+  // which is a coarse archetype tag ("ensemble_cast", registered
+  // through the same TagDefinition system as trope/mood tags), not
+  // actor names. Simple string list rather than a relational
+  // CastMember model for now — faster to ship; a real model (actor +
+  // optional character, reusable across titles so "more from this
+  // actor" becomes possible) is the natural next step if cast data
+  // ends up mattering more than expected, not built speculatively now.
+  castNames         String[]    @map("cast_names")
 
   // Skip Meter Stage 1 (editorial) — the curator's own honest read,
   // realistically formed from watching 1-2 episodes, not a full

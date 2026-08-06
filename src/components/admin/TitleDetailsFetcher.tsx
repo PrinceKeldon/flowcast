@@ -12,6 +12,8 @@ interface TitleDetailsFetcherProps {
   defaultSynopsis?: string;
   defaultCoverImageUrl?: string;
   defaultEpisodeCount?: number | string;
+  defaultCastNames?: string[];
+  defaultReleaseDate?: string;
 }
 
 export function TitleDetailsFetcher({
@@ -19,6 +21,8 @@ export function TitleDetailsFetcher({
   defaultSynopsis = "",
   defaultCoverImageUrl = "",
   defaultEpisodeCount = "",
+  defaultCastNames = [],
+  defaultReleaseDate = "",
 }: TitleDetailsFetcherProps) {
   const [referenceUrl, setReferenceUrl] = useState("");
   const [name, setName] = useState(defaultName);
@@ -26,6 +30,10 @@ export function TitleDetailsFetcher({
   const [coverImageUrl, setCoverImageUrl] = useState(defaultCoverImageUrl);
   const [episodeCount, setEpisodeCount] = useState<number | string>(defaultEpisodeCount);
   const [episodeCountSource, setEpisodeCountSource] = useState<"structured" | "text-pattern" | null>(null);
+  const [castNamesText, setCastNamesText] = useState(defaultCastNames.join(", "));
+  const [castNamesFetched, setCastNamesFetched] = useState(false);
+  const [releaseDate, setReleaseDate] = useState(defaultReleaseDate);
+  const [releaseDateFetched, setReleaseDateFetched] = useState(false);
   const [platformGuess, setPlatformGuess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -39,7 +47,14 @@ export function TitleDetailsFetcher({
     }
     startTransition(async () => {
       const result = await fetchTitleMetadata(referenceUrl.trim());
-      if (result.error && !result.name && !result.synopsis && !result.coverImageUrl && result.episodeCount === null) {
+      const foundNothing =
+        !result.name &&
+        !result.synopsis &&
+        !result.coverImageUrl &&
+        result.episodeCount === null &&
+        result.castNames.length === 0 &&
+        !result.releaseDate;
+      if (result.error && foundNothing) {
         setError(result.error);
         return;
       }
@@ -50,6 +65,17 @@ export function TitleDetailsFetcher({
       if (result.episodeCount !== null) {
         setEpisodeCount(result.episodeCount);
         setEpisodeCountSource(result.episodeCountSource);
+      }
+      if (result.castNames.length > 0) {
+        setCastNamesText(result.castNames.join(", "));
+        setCastNamesFetched(true);
+      }
+      if (result.releaseDate) {
+        // JSON-LD datePublished is usually ISO already; slice to the
+        // date-only portion an <input type="date"> expects, tolerating
+        // whatever's there rather than rejecting it outright.
+        setReleaseDate(result.releaseDate.slice(0, 10));
+        setReleaseDateFetched(true);
       }
     });
   }
@@ -156,6 +182,45 @@ export function TitleDetailsFetcher({
         {episodeCountSource === "text-pattern" && (
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Guessed from page text (no structured data found) — worth double-checking.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="releaseDate">Release date</label>
+        <input
+          id="releaseDate"
+          name="releaseDate"
+          type="date"
+          value={releaseDate}
+          onChange={(e) => {
+            setReleaseDate(e.target.value);
+            setReleaseDateFetched(false);
+          }}
+          className={inputClass}
+        />
+        {releaseDateFetched && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">From the page&apos;s own structured data — reliable.</p>
+        )}
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="castNames">Cast (comma-separated)</label>
+        <input
+          id="castNames"
+          name="castNames"
+          value={castNamesText}
+          onChange={(e) => {
+            setCastNamesText(e.target.value);
+            setCastNamesFetched(false);
+          }}
+          placeholder="Fetched automatically when available, or type names directly"
+          className={inputClass}
+        />
+        {castNamesFetched && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            From the page&apos;s own structured data — reliable. Not every platform includes this; blank just means
+            none was found, not that there&apos;s no cast.
           </p>
         )}
       </div>

@@ -836,3 +836,50 @@ comma-separated format the old plain field always submitted — so
 and `adminForms.ts` needed zero changes; as far as the backend's
 concerned, nothing about the field changed at all.
 
+## Cast + release date auto-fetch, trending thresholds, title text size
+
+Three small, unrelated fixes from one audit pass.
+
+**Trending had no minimum sample size.** Both `TrendingRail` and
+`FandomTrendingRail` on the homepage previously had zero floor — a
+single click-through or reaction was enough to label a title
+"trending." Every other honesty-gated signal in this app has a real
+threshold (`matching.ts`'s `MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL`,
+`actions.ts`'s `MIN_VOTES_FOR_SKIP_METER_DISPLAY`) — this was a real
+gap, not a deliberate exception. Both rails now use Prisma's `having`
+clause on the `groupBy` to require 5+ interactions before a title
+qualifies, same threshold used everywhere else for consistency.
+
+**Cast + release date, JSON-LD only, no guessing fallback.**
+`fetchTitleMetadata.ts` gained `castNames` (schema.org's `actor`
+field) and `releaseDate` (`datePublished`), alongside the existing
+episode-count extraction — refactored the JSON-LD parsing into one
+shared `parseJsonLdEntries()` rather than three separate re-scans of
+the same HTML. Deliberately **no text-pattern fallback** for either,
+unlike episode count: regex-matching prose for names is genuinely
+unreliable (false positives on any capitalized phrase), unlike
+matching a number next to the word "episodes" — if a platform doesn't
+publish structured data for these, the fields just stay blank for the
+admin to fill in, never a guess dressed up as a fetch. `castNames` is
+a simple `String[]` on `Title` (migration
+`20260805120000_add_title_cast_names`), not a relational `CastMember`
+model — faster to ship now; a real model (actor + optional character,
+reusable across titles so "more from this actor" becomes possible
+later) is the natural next step if cast data ends up mattering more
+than expected, not built speculatively ahead of that. Both fields now
+live in `TitleDetailsFetcher.tsx` — the deep-link section — rather
+than as separate plain fields, same reasoning as episode count already
+living there. `releaseDate` also got its first admin form field at
+all in this pass; it existed in the schema with no way to actually set
+it.
+
+Cast shows on `/title/[id]` (a plain comma-separated line under the
+synopsis) only when present — no separate "detail mode" or
+click-to-expand interaction, the existing detail page already is
+that.
+
+**`TitleCard`'s name text sized down** one step at each breakpoint
+(`text-base`/`lg:text-lg` → `text-sm`/`lg:text-base`) — purely a
+visual density adjustment on the homepage/rail cards, not touched
+anywhere else title text renders.
+

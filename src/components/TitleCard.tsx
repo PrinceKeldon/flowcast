@@ -37,7 +37,7 @@ export function TitleCard({ title, matchScore }: TitleCardProps) {
           ))}
         </div>
       </div>
-      <p className="mt-2 font-[var(--font-display)] text-base leading-tight text-[var(--text)] lg:text-lg">
+      <p className="mt-2 font-[var(--font-display)] text-sm leading-tight text-[var(--text)] lg:text-base">
         {title.name}
       </p>
       <p className="mt-0.5 font-mono text-[11px] text-[var(--text-muted)]">

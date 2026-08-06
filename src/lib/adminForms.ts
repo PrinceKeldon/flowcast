@@ -38,6 +38,7 @@ function splitTags(value: string): string[] {
 function parseTitleFields(formData: FormData) {
   const pacing = optionalStr(formData, "pacing") as Pacing | undefined;
   const episodeCountRaw = optionalStr(formData, "episodeCount");
+  const releaseDateRaw = optionalStr(formData, "releaseDate");
   const editorialHookPoint = optionalStr(formData, "editorialHookPoint") as
     | "hooks_fast"
     | "slow_burn"
@@ -69,6 +70,8 @@ function parseTitleFields(formData: FormData) {
       const raw = optionalStr(formData, "seasonNumber");
       return raw ? Number(raw) : undefined;
     })(),
+    castNames: splitTags(str(formData, "castNames")),
+    releaseDate: releaseDateRaw ? new Date(releaseDateRaw) : undefined,
   };
 }
 
