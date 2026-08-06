@@ -176,6 +176,13 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
 
           {title.synopsis && <p className="mb-7 leading-relaxed text-[var(--text)]">{title.synopsis}</p>}
 
+          {title.castNames.length > 0 && (
+            <p className="mb-7 text-sm text-[var(--text-muted)]">
+              <span className="font-mono text-[11px] uppercase tracking-wide">Cast: </span>
+              {title.castNames.join(", ")}
+            </p>
+          )}
+
           <p className="mb-3 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Watch on</p>
           <div className="mb-7">
             {title.availability.length > 0 ? (

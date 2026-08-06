@@ -18,6 +18,17 @@ export interface TitleMetadataResult {
    * also null.
    */
   episodeCountSource: "structured" | "text-pattern" | null;
+  /**
+   * Actor names from schema.org JSON-LD only — deliberately no
+   * text-pattern fallback the way episodeCount has one. Regex-matching
+   * prose for names is genuinely unreliable (false positives on any
+   * capitalized phrase), unlike matching a number next to the word
+   * "episodes". If it's not in structured data, this stays empty for
+   * the admin to fill in — never a guess.
+   */
+  castNames: string[];
+  /** Also JSON-LD only (datePublished) — same reasoning as castNames. */
+  releaseDate: string | null;
   error?: string;
 }
 
@@ -82,26 +93,78 @@ function resolveImageUrl(rawUrl: string, baseUrl: URL): string | null {
  * fallback below, because it's the platform explicitly stating a
  * count in machine-readable form rather than us guessing at prose.
  */
-function extractEpisodeCountFromJsonLd(html: string): number | null {
+/**
+ * Parses every JSON-LD <script> block on the page into plain objects,
+ * silently skipping anything malformed (common enough on real sites
+ * not to treat as a fetch failure). Shared by every structured-data
+ * extractor below rather than each re-scanning/re-parsing the HTML
+ * separately.
+ */
+function parseJsonLdEntries(html: string): Record<string, unknown>[] {
   const blocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  const entries: Record<string, unknown>[] = [];
 
   for (const block of blocks) {
     const jsonMatch = block.match(/>([\s\S]*?)<\/script>/i);
     if (!jsonMatch?.[1]) continue;
-
     try {
       const parsed = JSON.parse(jsonMatch[1].trim());
       const candidates = Array.isArray(parsed) ? parsed : [parsed];
       for (const entry of candidates) {
-        const count = entry?.numberOfEpisodes;
-        if (typeof count === "number" && count > 0) return Math.round(count);
-        if (typeof count === "string" && /^\d+$/.test(count)) return parseInt(count, 10);
+        if (entry && typeof entry === "object") entries.push(entry as Record<string, unknown>);
       }
     } catch {
-      // Malformed JSON-LD is common enough on real sites not to treat
-      // as a fetch failure — just skip this block and keep looking.
       continue;
     }
+  }
+  return entries;
+}
+
+/**
+ * Structured-data episode count — schema.org's numberOfEpisodes on a
+ * TVSeries/CreativeWorkSeries JSON-LD block, when a platform bothers
+ * to include one. Genuinely reliable when present, unlike the text
+ * fallback below, because it's the platform explicitly stating a
+ * count in machine-readable form rather than us guessing at prose.
+ */
+function extractEpisodeCountFromJsonLd(entries: Record<string, unknown>[]): number | null {
+  for (const entry of entries) {
+    const count = entry.numberOfEpisodes;
+    if (typeof count === "number" && count > 0) return Math.round(count);
+    if (typeof count === "string" && /^\d+$/.test(count)) return parseInt(count, 10);
+  }
+  return null;
+}
+
+/**
+ * Actor names from schema.org's `actor` field — a Person object, an
+ * array of them, or occasionally just a plain string name depending
+ * on how carefully a platform implemented their structured data.
+ * Deliberately no text-pattern fallback (see castNames' docstring on
+ * TitleMetadataResult) — this returns [] rather than guessing when
+ * nothing structured is found.
+ */
+function extractCastNamesFromJsonLd(entries: Record<string, unknown>[]): string[] {
+  for (const entry of entries) {
+    const actor = entry.actor;
+    if (!actor) continue;
+
+    const candidates = Array.isArray(actor) ? actor : [actor];
+    const names = candidates
+      .map((c) => (typeof c === "string" ? c : typeof c === "object" && c && "name" in c ? (c as { name: unknown }).name : null))
+      .filter((n): n is string => typeof n === "string" && n.trim().length > 0)
+      .map((n) => n.trim());
+
+    if (names.length > 0) return names;
+  }
+  return [];
+}
+
+/** schema.org's datePublished — same JSON-LD-only reasoning as castNames. Returned as-is (ISO-ish string); parsing/validation happens at the form boundary. */
+function extractReleaseDateFromJsonLd(entries: Record<string, unknown>[]): string | null {
+  for (const entry of entries) {
+    const date = entry.datePublished;
+    if (typeof date === "string" && date.trim().length > 0) return date.trim();
   }
   return null;
 }
@@ -151,6 +214,10 @@ function extractEpisodeCountFromText(html: string): number | null {
  * the caller which path produced it, so the admin form can show
  * honest confidence instead of presenting a text-pattern guess with
  * the same weight as a structured-data hit.
+ *
+ * castNames and releaseDate are JSON-LD-only, with no text-pattern
+ * fallback at all — see their docstrings on TitleMetadataResult for
+ * why a guess isn't good enough for either of those specifically.
  */
 export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataResult> {
   await requireAdmin();
@@ -162,6 +229,8 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
     platformGuess: null,
     episodeCount: null,
     episodeCountSource: null,
+    castNames: [],
+    releaseDate: null,
   };
 
   let url: URL;
@@ -235,13 +304,18 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
       extractMetaContent(html, "twitter:image") ?? extractMetaContent(html, "twitter:image:src");
     const coverImageUrl = rawImage ? resolveImageUrl(rawImage, url) : null;
 
-    const structuredEpisodeCount = extractEpisodeCountFromJsonLd(html);
+    const jsonLdEntries = parseJsonLdEntries(html);
+
+    const structuredEpisodeCount = extractEpisodeCountFromJsonLd(jsonLdEntries);
     const textEpisodeCount = structuredEpisodeCount === null ? extractEpisodeCountFromText(html) : null;
     const episodeCount = structuredEpisodeCount ?? textEpisodeCount;
     const episodeCountSource: TitleMetadataResult["episodeCountSource"] =
       structuredEpisodeCount !== null ? "structured" : textEpisodeCount !== null ? "text-pattern" : null;
 
-    if (!name && !synopsis && !coverImageUrl && episodeCount === null) {
+    const castNames = extractCastNamesFromJsonLd(jsonLdEntries);
+    const releaseDate = extractReleaseDateFromJsonLd(jsonLdEntries);
+
+    if (!name && !synopsis && !coverImageUrl && episodeCount === null && castNames.length === 0 && !releaseDate) {
       return { ...empty, error: "No usable metadata found on that page." };
     }
 
@@ -252,6 +326,8 @@ export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataR
       platformGuess: siteName,
       episodeCount,
       episodeCountSource,
+      castNames,
+      releaseDate,
     };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {

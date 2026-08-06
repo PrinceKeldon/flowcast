@@ -307,6 +307,8 @@ interface TitleFields {
   editorialEndingType?: "happy" | "bittersweet" | "cliffhanger" | "unresolved";
   seasonOfId?: string;
   seasonNumber?: number;
+  castNames?: string[];
+  releaseDate?: Date;
 }
 
 /**

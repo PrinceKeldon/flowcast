@@ -68,6 +68,16 @@ async function TrendingRail() {
   // Trending must be real or absent — see ARCHITECTURE.md. This returns
   // an empty array gracefully pre-launch (no interaction volume yet),
   // and TitleRail already hides itself when given an empty list.
+  //
+  // MIN_CLICKS_FOR_TRENDING mirrors the same 5-sample floor used
+  // everywhere else honesty-gated in this app (matching.ts's
+  // MIN_SESSIONS_FOR_BEHAVIORAL_SIGNAL, actions.ts's
+  // MIN_VOTES_FOR_SKIP_METER_DISPLAY) — found missing during an audit:
+  // this query previously had no floor at all, so a single click-through
+  // was enough to label a title "trending," which read as real signal
+  // but wasn't distinguishable from noise or the admin's own testing.
+  const MIN_CLICKS_FOR_TRENDING = 5;
+
   const since = new Date();
   since.setDate(since.getDate() - 7);
 
@@ -76,6 +86,7 @@ async function TrendingRail() {
     where: { action: "clicked_out", createdAt: { gte: since } },
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
+    having: { id: { _count: { gte: MIN_CLICKS_FOR_TRENDING } } },
     take: 10,
   });
 
@@ -109,6 +120,11 @@ async function FandomTrendingRail() {
   // that quietly accumulated reactions over a week. 48h gave enough
   // room for a slow news day without just re-showing TrendingRail's
   // week-old winners under a different label.
+  // MIN_REACTIONS_FOR_TRENDING mirrors the same 5-sample floor as
+  // TrendingRail above (and matching.ts/actions.ts elsewhere) — same
+  // audit finding, same fix: this had no floor either.
+  const MIN_REACTIONS_FOR_TRENDING = 5;
+
   const since = new Date();
   since.setHours(since.getHours() - 48);
 
@@ -117,6 +133,7 @@ async function FandomTrendingRail() {
     where: { action: "reacted", createdAt: { gte: since } },
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
+    having: { id: { _count: { gte: MIN_REACTIONS_FOR_TRENDING } } },
     take: 10,
   });
 

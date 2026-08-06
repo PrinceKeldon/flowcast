@@ -62,6 +62,8 @@ export default async function EditTitlePage({ params }: EditTitlePageProps) {
           defaultSynopsis={title.synopsis ?? ""}
           defaultCoverImageUrl={title.coverImageUrl ?? ""}
           defaultEpisodeCount={title.episodeCount ?? ""}
+          defaultCastNames={title.castNames}
+          defaultReleaseDate={title.releaseDate ? title.releaseDate.toISOString().slice(0, 10) : ""}
         />
 
         <div className="grid grid-cols-2 gap-4">
