@@ -31,7 +31,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     : [];
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-8 pb-14">
+    <main className="mx-auto max-w-6xl px-6 py-14 pb-20">
       {query && <SearchLogger query={query} resultCount={results.length} />}
       <Link
         href="/"
