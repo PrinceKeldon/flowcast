@@ -23,7 +23,7 @@ export async function SaveToCollectionSection({ titleId }: SaveToCollectionSecti
         <p className="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Save to Collection</p>
         <p className="mb-3 text-sm text-[var(--text-muted)]">Claim a name to start curating your own Collections.</p>
         <Link
-          href="/claim"
+          href={`/claim?next=${encodeURIComponent(`/title/${titleId}`)}`}
           className="inline-block rounded-xl border border-[var(--accent-marigold)] px-4 py-2 text-sm font-semibold text-[var(--accent-marigold)] transition-colors hover:bg-[var(--accent-marigold)]/10"
         >
           Claim a name

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { peekCuratorId } from "@/lib/curator";
@@ -31,10 +31,18 @@ export async function generateMetadata({ params }: CuratorPageProps): Promise<Me
 
 export default async function CuratorPage({ params }: CuratorPageProps) {
   const { displayName } = await params;
+
+  // Same gate as /collection/[id] — a curator's name and Collection
+  // titles are visible on the homepage rail and title pages without
+  // claiming anything, but opening their profile (where follow lives)
+  // is the moment that asks for a name. See ARCHITECTURE.md's
+  // Collections section.
+  const viewerCuratorId = await peekCuratorId();
+  if (!viewerCuratorId) redirect(`/claim?next=${encodeURIComponent(`/curator/${displayName}`)}`);
+
   const curator = await getCuratorByName(displayName);
   if (!curator) notFound();
 
-  const viewerCuratorId = await peekCuratorId();
   const isOwnProfile = viewerCuratorId === curator.id;
 
   const [followerDisplay, viewerIsFollowing] = await Promise.all([
@@ -64,15 +72,8 @@ export default async function CuratorPage({ params }: CuratorPageProps) {
           >
             New Collection
           </Link>
-        ) : viewerCuratorId ? (
-          <FollowButton curatorId={curator.id} initialIsFollowing={viewerIsFollowing} />
         ) : (
-          <Link
-            href="/claim"
-            className="shrink-0 rounded-xl border border-[var(--accent-marigold)] px-4 py-2 text-sm font-semibold text-[var(--accent-marigold)] transition-colors hover:bg-[var(--accent-marigold)]/10"
-          >
-            Claim a name to follow
-          </Link>
+          <FollowButton curatorId={curator.id} initialIsFollowing={viewerIsFollowing} />
         )}
       </div>
 

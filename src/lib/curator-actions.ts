@@ -24,6 +24,20 @@ function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
+/**
+ * Only ever redirect to a same-origin relative path after claiming a
+ * name. `next` comes from a query param round-tripped through a
+ * hidden form field (see ClaimIdentityForm.tsx) — treat it the same
+ * as any other user-supplied string. A bare "/" prefix with no
+ * leading "//" (protocol-relative) or "http"/backslash trick is the
+ * whole check; anything else falls back to the curator's own profile.
+ */
+function safeNextPath(next: string | null, fallback: string): string {
+  if (!next) return fallback;
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return fallback;
+  return next;
+}
+
 // ---------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------
@@ -70,9 +84,10 @@ export async function claimDisplayName(
     return { error: "That name is already taken." };
   }
 
+  let curatorId: string;
   try {
     const curator = await prisma.curator.create({ data: { displayName } });
-    await setCuratorCookie(curator.id);
+    curatorId = curator.id;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { error: "That name is already taken." };
@@ -81,7 +96,11 @@ export async function claimDisplayName(
     return { error: "Something went wrong — try again." };
   }
 
-  redirect(`/curator/${displayName}`);
+  // redirect() throws internally (that's how it interrupts render) —
+  // it has to happen outside the try/catch above, or it'd get caught
+  // and reported as "Something went wrong."
+  await setCuratorCookie(curatorId);
+  redirect(safeNextPath(str(formData, "next"), `/curator/${displayName}`));
 }
 
 /**
@@ -280,4 +299,165 @@ export async function getFollowerDisplay(
     return { count: real, real };
   }
   return { count: null, real };
+}
+
+// ---------------------------------------------------------------------
+// Likes
+// ---------------------------------------------------------------------
+//
+// Unlike follower counts, like counts are always shown as their real
+// number, never threshold-gated. The thing MIN_FOLLOWERS_FOR_PUBLIC_DISPLAY
+// protects against is a stat stamped on a *person's* public identity
+// reading as "nobody's here" — a like count on a piece of curation is
+// a normal, unremarkable content stat (same category as a track's
+// play count or a post's like count on any other platform), not an
+// identity signal, so it doesn't have the same cost at zero.
+
+async function requireLikeCuratorId(): Promise<string | null> {
+  return peekCuratorId();
+}
+
+export async function likeCollection(collectionId: string): Promise<void> {
+  const curatorId = await requireLikeCuratorId();
+  if (!curatorId) return;
+
+  try {
+    await prisma.collectionLike.create({ data: { curatorId, collectionId } });
+  } catch (err) {
+    // P2002 = already liked, not a real error — same idempotent-tap
+    // handling as followCurator().
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) {
+      console.error("Failed to like collection", err);
+    }
+  }
+  revalidatePath(`/collection/${collectionId}`);
+}
+
+export async function unlikeCollection(collectionId: string): Promise<void> {
+  const curatorId = await requireLikeCuratorId();
+  if (!curatorId) return;
+
+  await prisma.collectionLike.deleteMany({ where: { curatorId, collectionId } });
+  revalidatePath(`/collection/${collectionId}`);
+}
+
+export async function likeCollectionItem(collectionItemId: string, collectionId: string): Promise<void> {
+  const curatorId = await requireLikeCuratorId();
+  if (!curatorId) return;
+
+  try {
+    await prisma.collectionItemLike.create({ data: { curatorId, collectionItemId } });
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) {
+      console.error("Failed to like collection item", err);
+    }
+  }
+  revalidatePath(`/collection/${collectionId}`);
+}
+
+export async function unlikeCollectionItem(collectionItemId: string, collectionId: string): Promise<void> {
+  const curatorId = await requireLikeCuratorId();
+  if (!curatorId) return;
+
+  await prisma.collectionItemLike.deleteMany({ where: { curatorId, collectionItemId } });
+  revalidatePath(`/collection/${collectionId}`);
+}
+
+/** Server-side render state for a Collection's like button — real count plus whether the viewer (if any) already liked it. */
+export async function getCollectionLikeState(collectionId: string): Promise<{ count: number; liked: boolean }> {
+  const curatorId = await peekCuratorId();
+  const [count, liked] = await Promise.all([
+    prisma.collectionLike.count({ where: { collectionId } }),
+    curatorId
+      ? prisma.collectionLike.findUnique({ where: { curatorId_collectionId: { curatorId, collectionId } } }).then((r) => r !== null)
+      : Promise.resolve(false),
+  ]);
+  return { count, liked };
+}
+
+/** Same as getCollectionLikeState() but batched for every item in a Collection at once, to avoid N+1 queries when rendering the item list. */
+export async function getCollectionItemLikeStates(
+  collectionItemIds: string[]
+): Promise<Record<string, { count: number; liked: boolean }>> {
+  if (collectionItemIds.length === 0) return {};
+  const curatorId = await peekCuratorId();
+
+  const [counts, likedRows] = await Promise.all([
+    prisma.collectionItemLike.groupBy({
+      by: ["collectionItemId"],
+      where: { collectionItemId: { in: collectionItemIds } },
+      _count: { _all: true },
+    }),
+    curatorId
+      ? prisma.collectionItemLike.findMany({
+          where: { curatorId, collectionItemId: { in: collectionItemIds } },
+          select: { collectionItemId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const countById = new Map(counts.map((c) => [c.collectionItemId, c._count._all]));
+  const likedIds = new Set(likedRows.map((r) => r.collectionItemId));
+
+  return Object.fromEntries(
+    collectionItemIds.map((id) => [id, { count: countById.get(id) ?? 0, liked: likedIds.has(id) }])
+  );
+}
+
+// ---------------------------------------------------------------------
+// Discovery — making curators and Collections prominent
+// ---------------------------------------------------------------------
+//
+// Deliberately a step short of a full trending/leaderboard surface
+// (ARCHITECTURE.md's "not built in this pass" list still holds for
+// ranking-by-popularity): these are plain, unranked "recent" and
+// "alphabetical" listings, not a competitive social-proof surface.
+// The gate is what does the identity-driving work here, not ranking.
+
+/** Recently-updated Collections for the homepage rail — the primary "make curation visible" surface. */
+export async function getRecentCollections(limit = 8) {
+  return prisma.collection.findMany({
+    where: { items: { some: {} } },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    include: {
+      curator: { select: { displayName: true } },
+      _count: { select: { items: true } },
+      items: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { title: { select: { id: true, coverImageUrl: true, name: true } } },
+      },
+    },
+  });
+}
+
+/** Every published Collection that includes a given title, with its curator — surfaced directly on the title detail page. */
+export async function getCollectionsFeaturingTitle(titleId: string) {
+  const items = await prisma.collectionItem.findMany({
+    where: { titleId },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+    select: {
+      note: true,
+      collection: { select: { id: true, name: true, curator: { select: { displayName: true } } } },
+    },
+  });
+  return items.map((i) => ({ note: i.note, ...i.collection }));
+}
+
+/** All curators with at least one Collection — the /curators directory. */
+export async function getCuratorDirectory() {
+  const curators = await prisma.curator.findMany({
+    where: { collections: { some: { items: { some: {} } } } },
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { collections: true } } },
+  });
+
+  return Promise.all(
+    curators.map(async (c) => ({
+      ...c,
+      followers: await getFollowerDisplay(c.id, false),
+    }))
+  );
 }

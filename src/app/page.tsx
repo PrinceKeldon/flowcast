@@ -6,6 +6,7 @@ import { MoodChipBar } from "@/components/MoodChipBar";
 import { SearchBar } from "@/components/SearchBar";
 import { TitleRail } from "@/components/TitleRail";
 import { IdentityNavLink } from "@/components/IdentityNavLink";
+import { CollectionsRail } from "@/components/CollectionsRail";
 
 export const dynamic = "force-dynamic"; // trending/rails depend on live interaction data
 
@@ -24,9 +25,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <header className="mb-10">
         <div className="mb-2 flex items-center justify-between gap-4">
           <p className="font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Kilig</p>
-          <Suspense fallback={null}>
-            <IdentityNavLink />
-          </Suspense>
+          <div className="flex items-center gap-4">
+            <Link href="/curators" className="font-mono text-[11px] uppercase tracking-wide text-[var(--text-muted)] hover:text-[var(--accent-marigold)]">
+              Curators
+            </Link>
+            <Suspense fallback={null}>
+              <IdentityNavLink />
+            </Suspense>
+          </div>
         </div>
         <h1 className="mb-7 max-w-xl break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)] sm:text-4xl">
           What do you want to feel tonight?
@@ -42,6 +48,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
         <MoodChipBar />
       </header>
+
+      <Suspense fallback={null}>
+        <CollectionsRail />
+      </Suspense>
 
       <Suspense fallback={<p className="text-[var(--text-muted)]">Loading trending...</p>}>
         <TrendingRail />

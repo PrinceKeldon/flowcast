@@ -1,15 +1,19 @@
 "use client";
 
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { claimDisplayName, type ClaimDisplayNameState } from "@/lib/curator-actions";
 
 const initialState: ClaimDisplayNameState = {};
 
 export function ClaimIdentityForm() {
   const [state, formAction, isPending] = useActionState(claimDisplayName, initialState);
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
+      {next && <input type="hidden" name="next" value={next} />}
       <div>
         <label htmlFor="displayName" className="mb-1.5 block text-sm text-[var(--text)]">
           Pick a name

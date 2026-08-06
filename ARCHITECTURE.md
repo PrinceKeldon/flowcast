@@ -956,3 +956,56 @@ cap itself (a short note is a smaller, slower-velocity surface than
 open comments, but it's still user-generated free text — this needs
 real moderation before it scales past a trusted pilot group).
 
+## Collections, round two — prominence, the claim gate, and likes
+
+The first pass above under-shipped one thing: a Collection nobody can
+find isn't testing the follow-driven-by-taste hypothesis, it's just a
+private list. This pass makes curators and their Collections visible
+by default and turns "open one" into the moment that asks for a
+claimed name, rather than asking upfront before anyone has a reason
+to want one.
+
+**Visible without claiming, gated on open.** `CollectionsRail.tsx` (a
+new rail on the homepage, positioned first — above Trending) and
+`CuratedInSection.tsx` (a new section on every title page, showing
+which curators' Collections include that title) both render curator
+display names, Collection names, and — on the title page — the note
+itself, to every visitor, no identity required. `/curators` is a
+plain, unranked directory of every curator with at least one
+non-empty Collection, same visibility rule. What's gated is only the
+*destination*: `/collection/[id]` and `/curator/[displayName]` both
+open with `if (!peekCuratorId()) redirect('/claim?next=...')` before
+any other work happens on the page. `next` is round-tripped through
+`ClaimIdentityForm.tsx` as a hidden field and validated by
+`safeNextPath()` in `curator-actions.ts` (must be a same-origin
+relative path — this is the one place in the feature handling
+user-supplied redirect input, so it's checked like one) so claiming a
+name lands you back on the exact Collection or profile you tried to
+open, not a generic landing page.
+
+This is a real product tradeoff, not a free upgrade: gating the
+destination page (not just the follow/save actions within it) means a
+casual visitor can't read a Collection's full contents without
+claiming a name first. That's the explicit intent here — prominence
+without a claimed-name payoff would just be a nicer-looking version of
+the same discovery problem — but it trades away frictionless browsing
+for a stronger identity funnel, and that tradeoff should get revisited
+if it turns out to suppress curiosity clicks more than it converts
+them.
+
+**Likes are a second, lighter engagement surface**, added alongside
+follow: `CollectionLike` (liking a whole Collection) and
+`CollectionItemLike` (liking one curator's specific pick-plus-note
+within a Collection) — see the models' comments in `schema.prisma`
+for why they're tracked separately from each other and from the
+pre-existing `TitleReaction` (which is anonymous and per-title, not
+identity-attached or per-curation). Both require a claimed identity
+to write, same as follow, but — unlike the follower count — a like
+count is *never* threshold-gated: it's shown as its real number from
+zero always. The reasoning `MIN_FOLLOWERS_FOR_PUBLIC_DISPLAY` is built
+on is specifically about a stat stamped on a *person's* public
+identity reading as "nobody's here" (see the original Collections
+section above); a like count on a piece of content is a normal,
+unremarkable stat in the same category as a play count, and doesn't
+carry that cost at zero.
+

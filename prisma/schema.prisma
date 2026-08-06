@@ -304,6 +304,9 @@ model Curator {
   following   Follow[] @relation("CuratorFollowing")
   followedBy  Follow[] @relation("CuratorFollowedBy")
 
+  collectionLikes     CollectionLike[]
+  collectionItemLikes CollectionItemLike[]
+
   @@map("curators")
 }
 
@@ -323,6 +326,7 @@ model Collection {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   items     CollectionItem[]
+  likes     CollectionLike[]
 
   @@index([curatorId])
   @@map("collections")
@@ -345,6 +349,8 @@ model CollectionItem {
 
   note         String
   createdAt    DateTime   @default(now()) @map("created_at")
+
+  likes        CollectionItemLike[]
 
   @@unique([collectionId, titleId])
   @@index([titleId])
@@ -372,4 +378,42 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followingId])
   @@map("follows")
+}
+
+// Two distinct "like" surfaces, both scoped to a Curator (not the
+// anonymous sessionId) since liking is an identity-attached act here,
+// same as following — see the gating note in curator.ts and
+// ARCHITECTURE.md's Collections section. These are separate from the
+// existing TitleReaction model (actions.ts): TitleReaction is an
+// anonymous, per-session emoji reaction to a *title itself* — these
+// are a claimed curator vouching for a specific *curation*, either a
+// whole Collection or one curator's specific pick-plus-note within
+// it. Liking a Collection and liking one of its items are tracked
+// separately on purpose: someone might love one pick in an otherwise
+// unremarkable Collection, or love the Collection as a whole without
+// calling out any single entry.
+model CollectionLike {
+  id           String     @id @default(uuid())
+  curatorId    String     @map("curator_id")
+  curator      Curator    @relation(fields: [curatorId], references: [id], onDelete: Cascade)
+  collectionId String     @map("collection_id")
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([curatorId, collectionId])
+  @@index([collectionId])
+  @@map("collection_likes")
+}
+
+model CollectionItemLike {
+  id               String         @id @default(uuid())
+  curatorId        String         @map("curator_id")
+  curator          Curator        @relation(fields: [curatorId], references: [id], onDelete: Cascade)
+  collectionItemId String         @map("collection_item_id")
+  collectionItem   CollectionItem @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@unique([curatorId, collectionItemId])
+  @@index([collectionItemId])
+  @@map("collection_item_likes")
 }
