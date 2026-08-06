@@ -37,7 +37,7 @@ export default async function BrowseAllPage({ searchParams }: BrowseAllPageProps
   });
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-14 pb-20">
+    <main className="mx-auto max-w-6xl px-3 py-8 pb-14">
       <Link
         href="/"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent-marigold)]"

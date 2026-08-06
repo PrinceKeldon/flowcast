@@ -19,7 +19,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const chipsToShow = activeChips.length ? activeChips : DEFAULT_MOODS;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-14 pb-20">
+    <main className="mx-auto max-w-6xl px-3 py-8 pb-14">
       <header className="mb-10">
         <p className="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Kilig</p>
         <h1 className="mb-7 max-w-xl break-words font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--text)] sm:text-4xl">
