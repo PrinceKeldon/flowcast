@@ -17,6 +17,7 @@ import { TaxonomySignal } from "@/components/TaxonomySignal";
 import { TitleCoverArt } from "@/components/TitleCoverArt";
 import { ViewLogger } from "@/components/ViewLogger";
 import { TitleRail } from "@/components/TitleRail";
+import { SaveToCollectionSection } from "@/components/SaveToCollectionSection";
 import type { Availability } from "@/generated/prisma/client";
 
 interface TitleDetailPageProps {
@@ -205,6 +206,8 @@ export default async function TitleDetailPage({ params }: TitleDetailPageProps) 
           <ReactionsList reactions={title.reactions} />
 
           <ReactionTap titleId={title.id} initialReactedEmoji={initialReactedEmoji} />
+
+          <SaveToCollectionSection titleId={title.id} />
 
           <InsightsPanel tropeTags={title.tropeTags} moodTags={title.moodTags} pacing={title.pacing} />
 

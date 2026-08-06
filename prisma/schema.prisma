@@ -168,6 +168,7 @@ model Title {
   availability      Availability[]
   reactions         TitleReaction[]
   interactions      UserInteraction[]
+  collectionItems   CollectionItem[]
 
   @@index([language])
   @@index([pacing])
@@ -274,4 +275,101 @@ model SearchLog {
   @@index([createdAt])
   @@index([query])
   @@map("search_logs")
+}
+
+// Collections MVP — see ARCHITECTURE.md's "Collections" section for the
+// product reasoning. Deliberately NOT a full accounts system: a Curator
+// is claimed with just a display name (no password/email), which is
+// enough identity to publish a Collection and be followed, without
+// taking on the auth surface a real accounts system would need. The
+// existing admin single-shared-password gate and anonymous session
+// cookie (session.ts) are both untouched by this — Curator is a third,
+// separate identity concept, only used by the collections/follow
+// feature.
+model Curator {
+  id          String   @id @default(uuid())
+  // Claimed, not assigned — first-come-first-served, checked for
+  // uniqueness in claimDisplayName() (lib/curator-actions.ts). This is
+  // the identity a visitor sees and follows, so it's the natural
+  // unique key rather than a separate slug field.
+  displayName String   @unique @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  collections Collection[]
+
+  // Both sides of Follow named from Curator's point of view: rows
+  // where this curator is the one following someone, and rows where
+  // this curator is the one being followed. See Follow below for why
+  // both directions are needed as separate relations.
+  following   Follow[] @relation("CuratorFollowing")
+  followedBy  Follow[] @relation("CuratorFollowedBy")
+
+  @@map("curators")
+}
+
+// The primary object of this feature (see ARCHITECTURE.md) — not a
+// post, not a discussion thread. Deliberately just a name for now:
+// no description/cover-image/visibility fields yet, since the MVP is
+// exactly one Collection type (public, non-collaborative) and adding
+// those fields before the core save-a-title loop is validated would
+// be building ahead of the experiment this is meant to run.
+model Collection {
+  id        String   @id @default(uuid())
+  curatorId String   @map("curator_id")
+  curator   Curator  @relation(fields: [curatorId], references: [id], onDelete: Cascade)
+
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items     CollectionItem[]
+
+  @@index([curatorId])
+  @@map("collections")
+}
+
+// One saved title inside a Collection, with the curator's one-line
+// note — the entire "add" action described in the doc: save, one
+// line, done. @@unique prevents the same title being added to the
+// same Collection twice (re-adding just edits the note instead — see
+// addToCollection() in lib/curator-actions.ts). Note length (140 max)
+// is enforced in that action, not here — same division of labor as
+// the rest of this codebase (e.g. episode-number bounds checked in
+// actions.ts, not the schema).
+model CollectionItem {
+  id           String     @id @default(uuid())
+  collectionId String     @map("collection_id")
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  titleId      String     @map("title_id")
+  title        Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  note         String
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([collectionId, titleId])
+  @@index([titleId])
+  @@map("collection_items")
+}
+
+// The follow mechanic — built and recorded unconditionally from day
+// one, since it's the only way to actually test whether curation
+// drives fandom (see ARCHITECTURE.md). What's gated is not whether
+// this table gets written to, only what a *visitor* sees rendered
+// from it — see MIN_FOLLOWERS_FOR_PUBLIC_DISPLAY in
+// lib/curator-actions.ts. followerId/followingId both point at
+// Curator, so this needs two distinctly-named relations (Prisma can't
+// infer which is which from a single self-relation) — "CuratorFollowing"
+// is the follower's own list of who they follow, "CuratorFollowedBy" is
+// the target's list of who follows them.
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String   @map("follower_id")
+  follower    Curator  @relation("CuratorFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String   @map("following_id")
+  following   Curator  @relation("CuratorFollowedBy", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
 }
