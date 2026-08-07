@@ -7,6 +7,7 @@ import { peekCuratorId } from "@/lib/curator";
 import { removeFromCollection, getCollectionLikeState, getCollectionItemLikeStates } from "@/lib/curator-actions";
 import { TitleCoverArt } from "@/components/TitleCoverArt";
 import { LikeButton } from "@/components/LikeButton";
+import { SubmitTitleForm } from "@/components/SubmitTitleForm";
 
 interface CollectionPageProps {
   params: Promise<{ id: string }>;
@@ -19,7 +20,11 @@ async function getCollection(id: string) {
       curator: { select: { id: true, displayName: true } },
       items: {
         orderBy: { createdAt: "desc" },
-        include: { title: { select: { id: true, name: true, coverImageUrl: true, language: true, episodeCount: true } } },
+        include: {
+          title: {
+            select: { id: true, name: true, coverImageUrl: true, language: true, episodeCount: true, isPublished: true },
+          },
+        },
       },
     },
   });
@@ -50,7 +55,18 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
   if (!collection) notFound();
 
   const isOwner = viewerCuratorId === collection.curator.id;
-  const itemIds = collection.items.map((item) => item.id);
+
+  // Draft/unpublished titles (e.g. a curator's own pending "Add a
+  // title not on Kilig" submission) are visible only to the
+  // Collection's owner, with a "pending review" badge instead of a
+  // link into /title/[id] (which would 404/redirect for anyone but
+  // an admin anyway) and no like button — nobody but the owner can
+  // even see it yet, so a like count would be meaningless. Everyone
+  // else simply doesn't see the item at all — same "real or absent"
+  // rule as everywhere else honesty-gated in this app, not a broken
+  // card with a dead link.
+  const visibleItems = collection.items.filter((item) => item.title.isPublished || isOwner);
+  const itemIds = visibleItems.map((item) => item.id);
 
   const [collectionLikeState, itemLikeStates] = await Promise.all([
     getCollectionLikeState(collection.id),
@@ -81,38 +97,61 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
         </div>
       </div>
 
-      {collection.items.length === 0 ? (
-        <p className="text-[var(--text-muted)]">
+      {visibleItems.length === 0 ? (
+        <p className="mb-8 text-[var(--text-muted)]">
           Nothing saved here yet{isOwner && " — save a title from any title page to get started"}.
         </p>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {collection.items.map((item) => {
+        <ul className="mb-8 flex flex-col gap-4">
+          {visibleItems.map((item) => {
+            const isPending = !item.title.isPublished;
             const likeState = itemLikeStates[item.id] ?? { count: 0, liked: false };
             return (
               <li
                 key={item.id}
                 className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3"
               >
-                <Link href={`/title/${item.title.id}`} className="block w-[72px] shrink-0">
-                  <div className="aspect-[9/16] overflow-hidden rounded-xl bg-black">
-                    <TitleCoverArt title={item.title} showTitleOverlay={false} />
+                {isPending ? (
+                  <div className="block w-[72px] shrink-0">
+                    <div className="aspect-[9/16] overflow-hidden rounded-xl bg-black opacity-60">
+                      <TitleCoverArt title={item.title} showTitleOverlay={false} />
+                    </div>
                   </div>
-                </Link>
-                <div className="flex min-w-0 flex-1 flex-col justify-center">
-                  <Link href={`/title/${item.title.id}`} className="font-[var(--font-display)] text-base text-[var(--text)] hover:text-[var(--accent-marigold)]">
-                    {item.title.name}
+                ) : (
+                  <Link href={`/title/${item.title.id}`} className="block w-[72px] shrink-0">
+                    <div className="aspect-[9/16] overflow-hidden rounded-xl bg-black">
+                      <TitleCoverArt title={item.title} showTitleOverlay={false} />
+                    </div>
                   </Link>
+                )}
+                <div className="flex min-w-0 flex-1 flex-col justify-center">
+                  {isPending ? (
+                    <p className="font-[var(--font-display)] text-base text-[var(--text)]">{item.title.name}</p>
+                  ) : (
+                    <Link
+                      href={`/title/${item.title.id}`}
+                      className="font-[var(--font-display)] text-base text-[var(--text)] hover:text-[var(--accent-marigold)]"
+                    >
+                      {item.title.name}
+                    </Link>
+                  )}
+                  {isPending && (
+                    <span className="mb-1 mt-0.5 w-fit rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Pending review
+                    </span>
+                  )}
                   <p className="mt-1 text-sm leading-snug text-[var(--text-muted)]">&ldquo;{item.note}&rdquo;</p>
                   <div className="mt-2 flex items-center gap-3">
-                    <LikeButton
-                      kind="item"
-                      id={item.id}
-                      collectionId={collection.id}
-                      initialLiked={likeState.liked}
-                      initialCount={likeState.count}
-                      size="sm"
-                    />
+                    {!isPending && (
+                      <LikeButton
+                        kind="item"
+                        id={item.id}
+                        collectionId={collection.id}
+                        initialLiked={likeState.liked}
+                        initialCount={likeState.count}
+                        size="sm"
+                      />
+                    )}
                     {isOwner && (
                       <form action={removeFromCollection.bind(null, collection.id, item.title.id)}>
                         <button
@@ -129,6 +168,13 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
             );
           })}
         </ul>
+      )}
+
+      {isOwner && (
+        <>
+          <p className="mb-3 font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">Or</p>
+          <SubmitTitleForm collectionId={collection.id} />
+        </>
       )}
     </main>
   );

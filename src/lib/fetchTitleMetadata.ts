@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAdmin } from "@/lib/admin";
+import { peekCuratorId } from "@/lib/curator";
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_BYTES = 400_000; // was head-only (200KB); episode-count extraction needs body text too now
@@ -221,7 +222,39 @@ function extractEpisodeCountFromText(html: string): number | null {
  */
 export async function fetchTitleMetadata(rawUrl: string): Promise<TitleMetadataResult> {
   await requireAdmin();
+  return fetchTitleMetadataCore(rawUrl);
+}
 
+/**
+ * Curator-facing equivalent of fetchTitleMetadata() above — same core
+ * fetch/parse logic, different authorization (any claimed Curator,
+ * not just admin) and deliberately no distinction beyond that: a
+ * curator's "Add a title not on Kilig" preview gets exactly the same
+ * fields, same reliability tiers, same honesty about what's a
+ * structured-data hit vs. a text-pattern guess. See
+ * submitTitleFromLink() in curator-actions.ts for what happens after
+ * the preview — this function only ever fetches and previews, it
+ * never writes anything.
+ */
+export async function fetchTitleMetadataForCurator(rawUrl: string): Promise<TitleMetadataResult> {
+  const curatorId = await peekCuratorId();
+  if (!curatorId) {
+    return {
+      name: null,
+      synopsis: null,
+      coverImageUrl: null,
+      platformGuess: null,
+      episodeCount: null,
+      episodeCountSource: null,
+      castNames: [],
+      releaseDate: null,
+      error: "Claim a name before adding a title.",
+    };
+  }
+  return fetchTitleMetadataCore(rawUrl);
+}
+
+async function fetchTitleMetadataCore(rawUrl: string): Promise<TitleMetadataResult> {
   const empty: TitleMetadataResult = {
     name: null,
     synopsis: null,

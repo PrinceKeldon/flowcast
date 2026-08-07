@@ -10,7 +10,13 @@ export default async function AdminPage() {
 
   const titles = await prisma.title.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, isPublished: true, language: true },
+    select: {
+      id: true,
+      name: true,
+      isPublished: true,
+      language: true,
+      submittedByCurator: { select: { displayName: true } },
+    },
   });
 
   return (
@@ -66,6 +72,7 @@ export default async function AdminPage() {
                 <span>{t.name}</span>
                 <span className="font-mono text-[11px] uppercase text-[var(--text-muted)]">
                   {t.language} · {t.isPublished ? "published" : "draft"}
+                  {t.submittedByCurator && ` · via ${t.submittedByCurator.displayName}`}
                 </span>
               </Link>
             </li>

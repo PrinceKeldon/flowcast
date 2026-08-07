@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { peekCuratorId, setCuratorCookie } from "@/lib/curator";
+import { checkDuplicate } from "@/lib/discovery/duplicate";
 import { Prisma } from "@/generated/prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -217,6 +218,105 @@ export async function getMyCollections() {
   });
 }
 
+/**
+ * "Add a title not on Kilig" — the curator-facing counterpart to
+ * createTitleAction() in adminForms.ts, deliberately simpler and
+ * stricter in different ways:
+ *
+ * - Simpler: only the fields fetchTitleMetadataForCurator() can
+ *   actually surface (name, synopsis, cover, episode count, cast,
+ *   release date) plus this curator's own note. No trope/mood tags,
+ *   no Skip Meter fields, no publish toggle, no season linking —
+ *   those stay editorial, decided at admin review time, same as
+ *   every field a curator isn't positioned to judge.
+ * - Stricter on duplicates: admin's version warns but allows an
+ *   override; this one blocks outright on a likely match and points
+ *   at the existing title instead, since a curator doesn't have the
+ *   context to knowingly override the way admin might (e.g. not
+ *   knowing about season-linking) — see ARCHITECTURE.md.
+ *
+ * Always creates isPublished: false and stamps submittedByCuratorId,
+ * then immediately adds the new draft into the curator's chosen
+ * Collection — this is *why* the title shows up in their collection
+ * right away even before admin reviews it (with a "pending review"
+ * badge — see CollectionPage's isPublished-aware rendering) rather
+ * than only appearing once published.
+ */
+export interface SubmitTitleState {
+  error?: string;
+  duplicateOf?: { id: string; name: string };
+}
+
+export async function submitTitleFromLink(
+  _prevState: SubmitTitleState,
+  formData: FormData
+): Promise<SubmitTitleState> {
+  const curatorId = await peekCuratorId();
+  if (!curatorId) return { error: "Claim a name before adding a title." };
+
+  const collectionId = str(formData, "collectionId");
+  const collection = await prisma.collection.findUnique({
+    where: { id: collectionId },
+    select: { curatorId: true },
+  });
+  if (!collection || collection.curatorId !== curatorId) {
+    return { error: "That's not one of your Collections." };
+  }
+
+  const name = str(formData, "name");
+  if (!name) {
+    return { error: "Couldn't get a title name from that link — try fetching again, or a different page." };
+  }
+
+  const duplicate = await checkDuplicate(name);
+  if (duplicate.isDuplicate && duplicate.existingTitleId && duplicate.existingTitleName) {
+    return {
+      error: "This looks like it's already on Kilig.",
+      duplicateOf: { id: duplicate.existingTitleId, name: duplicate.existingTitleName },
+    };
+  }
+
+  const synopsis = str(formData, "synopsis");
+  const coverImageUrl = str(formData, "coverImageUrl");
+  const episodeCountRaw = str(formData, "episodeCount");
+  const castNamesRaw = str(formData, "castNames");
+  const releaseDateRaw = str(formData, "releaseDate");
+  const note = str(formData, "note").slice(0, NOTE_MAX_LENGTH);
+
+  const title = await prisma.title.create({
+    data: {
+      name,
+      synopsis: synopsis || undefined,
+      // Same default reasoning as the admin form — see
+      // ARCHITECTURE.md's "viewing language, not production language"
+      // reframing. Not a field a curator should have to think about
+      // either.
+      language: "en",
+      tropeTags: [],
+      moodTags: [],
+      castNames: castNamesRaw
+        ? castNamesRaw.split(",").map((s) => s.trim()).filter(Boolean)
+        : [],
+      episodeCount: episodeCountRaw ? Number(episodeCountRaw) : undefined,
+      releaseDate: releaseDateRaw ? new Date(releaseDateRaw) : undefined,
+      coverImageUrl: coverImageUrl || undefined,
+      isPublished: false,
+      submittedByCuratorId: curatorId,
+    },
+  });
+
+  await prisma.collectionItem.create({
+    data: {
+      collectionId,
+      titleId: title.id,
+      note: note || "Added by me — pending review before it's fully live on Kilig.",
+    },
+  });
+
+  revalidatePath(`/collection/${collectionId}`);
+  redirect(`/collection/${collectionId}`);
+}
+
 // ---------------------------------------------------------------------
 // Following
 // ---------------------------------------------------------------------
@@ -415,15 +515,24 @@ export async function getCollectionItemLikeStates(
 // The gate is what does the identity-driving work here, not ranking.
 
 /** Recently-updated Collections for the homepage rail — the primary "make curation visible" surface. */
+/**
+ * Only the most recently-updated items count, and only published
+ * ones — a pending "Add a title not on Kilig" submission (see
+ * submitTitleFromLink()) must never be the cover art a totally
+ * anonymous homepage visitor sees. A Collection whose only items are
+ * still pending review just shows no cover art, same graceful
+ * degradation as everywhere else that filters rather than leaks.
+ */
 export async function getRecentCollections(limit = 8) {
   return prisma.collection.findMany({
-    where: { items: { some: {} } },
+    where: { items: { some: { title: { isPublished: true } } } },
     orderBy: { updatedAt: "desc" },
     take: limit,
     include: {
       curator: { select: { displayName: true } },
-      _count: { select: { items: true } },
+      _count: { select: { items: { where: { title: { isPublished: true } } } } },
       items: {
+        where: { title: { isPublished: true } },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: { title: { select: { id: true, coverImageUrl: true, name: true } } },

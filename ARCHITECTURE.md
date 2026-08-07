@@ -1009,3 +1009,60 @@ section above); a like count on a piece of content is a normal,
 unremarkable stat in the same category as a play count, and doesn't
 carry that cost at zero.
 
+## "Add a title not on Kilig" — curator submissions
+
+Extends Collections rather than sitting beside it: a claimed Curator
+can now bring a genuinely new title into the catalogue from their own
+Collection page, not just save titles that already exist.
+
+**A real gap this surfaced first:** `/collection/[id]/page.tsx`
+previously had zero `isPublished` awareness — every `CollectionItem`
+rendered unconditionally, safe only because the sole way to add one
+was picking from already-published titles. Letting a curator add a
+*draft* title would have leaked it (name, cover, note) to every public
+visitor, even though `/title/[id]` itself already correctly blocks
+non-admins from viewing unpublished title pages. Fixed as part of
+this: the collection page now filters unpublished items out entirely
+for anyone but the owner, and shows the owner a "pending review" badge
+instead of a live link — same "real or absent" rule as
+`TrendingRail`/`FandomTrendingRail`/Skip Meter's aggregate, applied to
+a new surface. Pending items also don't get a `LikeButton` — nobody
+but the owner can even see one, so a like count would be meaningless.
+
+**`submitTitleFromLink()`** (`curator-actions.ts`) is the curator
+counterpart to `createTitleAction()` (`adminForms.ts`), deliberately
+different in both directions:
+
+- *Simpler*: only the fields `fetchTitleMetadataForCurator()` can
+  actually surface — name, synopsis, cover, episode count, cast,
+  release date — plus the curator's own 140-char note. No trope/mood
+  tags, no Skip Meter fields, no publish toggle, no season linking.
+  Those stay editorial, decided at admin review time, same reasoning
+  as why a curator shouldn't have to make judgment calls even the
+  founder said they struggle with for their own entries. `language`
+  defaults silently to `"en"`, same reasoning as the admin form's
+  reframing — not a field to ask a curator to think about either.
+- *Stricter on duplicates*: admin's version warns but allows an
+  override; this one **blocks outright** on a likely match and points
+  the curator at the existing title to save into their Collection
+  instead, no override. A curator doesn't have the context to
+  knowingly override the way admin might (e.g. not knowing about
+  season-linking) — a deliberate, discussed choice, not an oversight.
+
+`fetchTitleMetadata()` itself gained a sibling,
+`fetchTitleMetadataForCurator()` — same core fetch/parse logic
+(`fetchTitleMetadataCore()`, factored out so neither copy duplicates
+the JSON-LD/og-tag parsing), different authorization: `requireAdmin()`
+for the original, "has a claimed Curator identity" for the new one.
+Two gates on the same underlying capability, not two implementations
+of it.
+
+Every submitted title is created `isPublished: false` and stamped
+`submittedByCuratorId` (new field on `Title`, `SetNull` on curator
+deletion so removing a curator doesn't delete the titles they brought
+in), then immediately added to the curator's chosen Collection — this
+is *why* it shows up in their Collection right away, pending badge and
+all, rather than only appearing once an admin publishes it. The admin
+title queue (`/admin`) now shows `· via {displayName}` on any title
+that came in this way, for review context.
+

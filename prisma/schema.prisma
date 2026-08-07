@@ -123,6 +123,14 @@ model Title {
   seasons           Title[]     @relation("TitleSeasons")
   seasonNumber      Int?        @map("season_number")
 
+  // Provenance for a title a Curator (see Curator model below)
+  // submitted via "Add a title not on Kilig" — null for everything
+  // else (admin-created titles, or titles that predate this feature).
+  // SetNull rather than Cascade: deleting a Curator shouldn't delete
+  // the titles they brought into the catalogue, just the attribution.
+  submittedByCuratorId String?  @map("submitted_by_curator_id")
+  submittedByCurator   Curator? @relation(fields: [submittedByCuratorId], references: [id], onDelete: SetNull)
+
   // Taxonomy — normalized and auto-registered into TagDefinition by
   // createTitle() (see lib/actions.ts): typing a new tag grows the
   // vocabulary rather than being rejected, so TagDefinition stays a
@@ -306,6 +314,12 @@ model Curator {
 
   collectionLikes     CollectionLike[]
   collectionItemLikes CollectionItemLike[]
+
+  // Titles this curator brought into the catalogue via "Add a title
+  // not on Kilig" (see submitTitleFromLink() in curator-actions.ts) —
+  // separate from collections, which can hold any title, not just
+  // ones this curator personally introduced.
+  submittedTitles Title[]
 
   @@map("curators")
 }
