@@ -184,10 +184,16 @@ export function DiscoveryMissionRunner({ sources }: DiscoveryMissionRunnerProps)
 }
 
 function MissionResultView({ result }: { result: DiscoveryRunResult }) {
-  const { summary, items } = result;
+  const { summary, items, error, logs } = result;
 
   return (
     <div className="flex flex-col gap-4">
+      {error && (
+        <p className="rounded-xl border border-[var(--accent-rose)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--accent-rose)]">
+          {error}
+        </p>
+      )}
+
       <div className="grid grid-cols-5 gap-2">
         <SummaryStat label="Discovered" value={summary.totalDiscovered} />
         <SummaryStat label="Imported" value={summary.imported} accent="marigold" />
@@ -207,6 +213,30 @@ function MissionResultView({ result }: { result: DiscoveryRunResult }) {
             <MissionItemRow key={i} item={item} />
           ))}
         </ul>
+      )}
+
+      {logs.length > 0 && (
+        <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+          <summary className="cursor-pointer font-mono text-xs uppercase tracking-wide text-[var(--text-muted)]">
+            Mission log ({logs.length})
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1">
+            {logs.map((entry, i) => (
+              <li
+                key={i}
+                className={`font-mono text-xs ${
+                  entry.level === "error"
+                    ? "text-[var(--accent-rose)]"
+                    : entry.level === "warn"
+                      ? "text-[var(--accent-marigold)]"
+                      : "text-[var(--text-muted)]"
+                }`}
+              >
+                {entry.message}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -256,6 +286,16 @@ function MissionItemRow({ item }: { item: ImportedDiscoveryItem }) {
         </p>
       )}
       {failure && <p className="mt-1.5 text-xs text-[var(--accent-rose)]">{failure}</p>}
+      {result.warnings.length > 0 && (
+        <ul className="mt-1.5 flex flex-col gap-0.5">
+          {result.warnings.map((w, i) => (
+            <li key={i} className="text-xs text-[var(--text-muted)]">
+              {w.field !== "*" && <span className="font-mono">{w.field}: </span>}
+              {w.message}
+            </li>
+          ))}
+        </ul>
+      )}
       {result.missingFields.length > 0 && (
         <p className="mt-1.5 text-xs text-[var(--text-muted)]">
           Missing: {result.missingFields.join(", ")}

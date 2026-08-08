@@ -31,10 +31,15 @@ export const shortMaxPlugin: DiscoveryPlugin = {
     }
 
     const urls = request.urls ?? [];
-    return urls
-      .filter((url) => shortMaxPlugin.supports(url))
-      .slice(0, request.quantity)
-      .map((titleUrl) => ({ titleUrl, source: "ShortMax" as const }));
+    const matched = urls.filter((url) => shortMaxPlugin.supports(url));
+    if (urls.length > 0 && matched.length === 0) {
+      // Same reasoning as reelshort.ts's identical check — see that
+      // file's comment.
+      throw new Error(
+        `None of the ${urls.length} pasted URL(s) are shorttv.live links. Check you selected the right Source for these links.`
+      );
+    }
+    return matched.slice(0, request.quantity).map((titleUrl) => ({ titleUrl, source: "ShortMax" as const }));
   },
 
   async importTitle(url: string): Promise<ImportResult> {

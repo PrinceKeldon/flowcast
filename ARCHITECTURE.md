@@ -1066,3 +1066,46 @@ all, rather than only appearing once an admin publishes it. The admin
 title queue (`/admin`) now shows `· via {displayName}` on any title
 that came in this way, for review context.
 
+## Discovery Engine — fixing three silent-failure points
+
+`/admin/discovery`'s manualUrls mission was reported as "surfacing
+nothing no matter what URL I throw at it." Investigation found three
+separate silent-failure points compounding into that symptom, not one
+bug:
+
+1. `MissionLogger`'s own docstring claimed its buffer was "an
+   in-memory buffer the admin UI can read back after a run finishes"
+   — but `getEntries()` was never called anywhere. Every diagnostic
+   message (a plugin's specific, useful thrown error, duplicate-skip
+   reasons, etc.) went into a buffer nobody read. `DiscoveryRunResult`
+   now carries `logs: LogEntry[]`, and `DiscoveryMissionRunner.tsx`
+   renders it in a collapsible "Mission log" panel under the results.
+2. `runMission()` caught a failed `plugin.discover()` call and
+   returned a plain, empty, structurally-successful-looking result —
+   visually identical to a run that genuinely found nothing. This is
+   what made DramaBox (intentionally unimplemented — see that
+   plugin's docstring, it hit real bot-detection and correctly wasn't
+   built around) and ReelShort/ShortMax-outside-manualUrls (which
+   both throw a specific, correct error already) invisible: the error
+   message existed, it just never reached the person running the
+   mission. `DiscoveryRunResult` now carries an optional `error`
+   field, set from the caught exception, rendered as a banner above
+   the summary stats.
+3. `reelshort.ts`/`shortmax.ts`'s manualUrls `discover()` silently
+   dropped any pasted URL that didn't hostname-match via their own
+   `supports()` — e.g. pasting ShortMax links while "ReelShort" is
+   selected in the Source dropdown returned `[]` with no explanation.
+   Both now throw a specific error (caught by fix #2, so it surfaces
+   the same way) when every pasted URL got filtered out, naming the
+   expected domain so the actual mistake (wrong Source selected, or a
+   URL from neither of the two implemented sources) is legible instead
+   of a bare zero.
+
+None of these fixes touch how any plugin fetches or parses a page —
+that logic (`webExtract.ts`, `buildResult.ts`) was already correct and
+already recorded its own failures (`ImportResult.warnings`); the
+fourth, smaller fix was that `MissionItemRow` never rendered
+`warnings` at all, so even a discovered-and-attempted URL that failed
+to fetch (bot-blocked, timed out, wrong content-type) showed up blank
+with the actual reason computed and thrown away. It's rendered now.
+

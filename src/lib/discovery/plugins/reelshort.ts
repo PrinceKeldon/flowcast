@@ -42,10 +42,19 @@ export const reelShortPlugin: DiscoveryPlugin = {
     }
 
     const urls = request.urls ?? [];
-    return urls
-      .filter((url) => reelShortPlugin.supports(url))
-      .slice(0, request.quantity)
-      .map((titleUrl) => ({ titleUrl, source: "ReelShort" as const }));
+    const matched = urls.filter((url) => reelShortPlugin.supports(url));
+    if (urls.length > 0 && matched.length === 0) {
+      // Every pasted URL got dropped by supports() — almost always
+      // means the wrong Source is selected for these links (e.g.
+      // ShortMax URLs pasted while "ReelShort" is picked). Throwing
+      // here, rather than returning [], is what makes this show up
+      // as a real error in the admin UI instead of a bare "0
+      // discovered" that looks identical to a genuinely empty run.
+      throw new Error(
+        `None of the ${urls.length} pasted URL(s) are reelshort.com links. Check you selected the right Source for these links.`
+      );
+    }
+    return matched.slice(0, request.quantity).map((titleUrl) => ({ titleUrl, source: "ReelShort" as const }));
   },
 
   async importTitle(url: string): Promise<ImportResult> {

@@ -13,6 +13,8 @@
  * first thing updated.
  */
 
+import type { LogEntry } from "./logger";
+
 // ---------------------------------------------------------------------------
 // Sources & missions
 // ---------------------------------------------------------------------------
@@ -189,6 +191,10 @@ export interface DiscoverySummary {
 export interface DiscoveryRunResult {
   summary: DiscoverySummary;
   items: ImportedDiscoveryItem[];
+  /** Set when the discovery phase itself failed (e.g. a plugin that's unimplemented for this source, or a mission it doesn't support) — distinct from a per-item failure, which lands on that item instead. A genuinely empty-but-successful run has this unset. */
+  error?: string;
+  /** Every log line from this run, in order — the mission logger's buffer, actually surfaced. See MissionLogger.getEntries(). */
+  logs: LogEntry[];
 }
 
 // ---------------------------------------------------------------------------

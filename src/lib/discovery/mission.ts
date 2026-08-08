@@ -113,7 +113,18 @@ export async function runMission(request: DiscoveryRequest): Promise<DiscoveryRu
     discovered = await plugin.discover(request);
     logger.info(`Discovered ${discovered.length} candidate URL(s)`);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Discovery phase failed for an unknown reason.";
     logger.error("Discovery phase failed — aborting mission", err);
+    // Previously this returned a plain empty-but-"successful" result,
+    // indistinguishable in the UI from a run that genuinely found
+    // nothing. That's the actual bug behind "surfacing nothing no
+    // matter what URL I throw at it": a plugin that's intentionally
+    // unimplemented for its source (DramaBox — see that plugin's
+    // docstring), or that doesn't support the selected mission
+    // (ReelShort/ShortMax outside manualUrls), throws a real,
+    // specific, useful error message right here — and it was being
+    // thrown away. Now it's returned on `error` so the admin UI can
+    // actually show it instead of a silent "No items discovered."
     return {
       summary: {
         totalDiscovered: 0,
@@ -124,6 +135,8 @@ export async function runMission(request: DiscoveryRequest): Promise<DiscoveryRu
         durationMs: Date.now() - startedAt,
       },
       items: [],
+      error: message,
+      logs: logger.getEntries().slice(),
     };
   }
 
@@ -186,7 +199,20 @@ export async function runMission(request: DiscoveryRequest): Promise<DiscoveryRu
     durationMs: Date.now() - startedAt,
   };
 
+  if (discovered.length === 0 && request.mission === "manualUrls" && (request.urls?.length ?? 0) > 0) {
+    // The plugin didn't throw, but every pasted URL got filtered out
+    // by its own supports(url) check — e.g. a ReelShort source
+    // selected with ShortMax links pasted in, or vice versa. Same
+    // "silent zero" problem as the discover()-throws case above, just
+    // from a different code path (each plugin's own manualUrls
+    // filter, not an exception) — worth a clear log line since the
+    // summary panel alone won't explain it.
+    logger.warn(
+      `None of the ${request.urls!.length} pasted URL(s) matched ${request.source}'s expected domain — check the Source dropdown matches where these links are actually from.`
+    );
+  }
+
   logger.info("Mission finished", summary);
 
-  return { summary, items };
+  return { summary, items, logs: logger.getEntries().slice() };
 }
